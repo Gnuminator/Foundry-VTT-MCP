@@ -8,6 +8,8 @@ import * as net from 'net';
 
 import { spawn, ChildProcess } from 'child_process';
 
+import { evaluateLockFile } from './lock.js';
+
 import { config } from './config.js';
 
 import { Logger } from './logger.js';
@@ -177,8 +179,23 @@ function acquireLock(): boolean {
           try {
             process.kill(lockPid, 0);
 
-            // Backend already running - return false to exit gracefully
-            return false;
+            // A process with this PID is alive. Validate it is actually our
+            // backend (node.exe / node) and that the lock file is not stale.
+            // PID reuse by unrelated OS processes (e.g. GameInputRedistService
+            // on Windows) would otherwise cause a false "already running" exit.
+            if (evaluateLockFile(lockPid, LOCK_FILE) === 'orphaned') {
+              console.error(
+                `Removing orphaned backend lock for PID ${lockPid} ` +
+                `(process is not node.exe or lock file is stale)`,
+              );
+              try { fs.unlinkSync(LOCK_FILE); } catch {}
+              lockFd = fs.openSync(LOCK_FILE, 'wx');
+            } else {
+              // Backend is genuinely running — exit gracefully
+              return false;
+            }
+
+>>>>>>> 557aaf8 (fix: validate process name in acquireLock to prevent PID collision false positives)
           } catch {
             console.error(`Removing stale backend lock for PID ${lockPid}`);
 
