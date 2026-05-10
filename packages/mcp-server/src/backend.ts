@@ -1492,6 +1492,18 @@ async function startBackend(): Promise<void> {
 
                   break;
 
+                case 'update-world-items':
+
+                  result = await characterTools.handleUpdateWorldItems(args);
+
+                  break;
+
+                case 'list-world-items':
+
+                  result = await characterTools.handleListWorldItems(args);
+
+                  break;
+
                 case 'create-world-items':
 
                   result = await characterTools.handleCreateWorldItems(args);
