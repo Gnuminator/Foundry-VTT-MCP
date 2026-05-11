@@ -96,7 +96,7 @@ export class DnD5eFeatureTools {
             },
             areaType: {
               type: 'string',
-              enum: ['cone', 'cube', 'cylinder', 'line', 'radius', 'sphere', ''],
+              enum: ['cone', 'cube', 'cylinder', 'emanation', 'line', 'radius', 'sphere', ''],
               description: 'Area-of-effect template shape; omit or use "" for no template',
               default: '',
             },
@@ -150,7 +150,7 @@ export class DnD5eFeatureTools {
           )
           .min(1, 'at least one damage part is required'),
         halfOnSave:  z.boolean().default(true),
-        areaType:    z.enum(['cone', 'cube', 'cylinder', 'line', 'radius', 'sphere', '']).default(''),
+        areaType:    z.enum(['cone', 'cube', 'cylinder', 'emanation', 'line', 'radius', 'sphere', '']).default(''),
         areaSize:    z.number().positive().optional(),
         areaUnits:   z.enum(['ft', 'm']).default('ft'),
         affectsType: z.enum(['creature', 'object', 'space', '']).default('creature'),

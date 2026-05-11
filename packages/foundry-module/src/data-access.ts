@@ -7023,14 +7023,6 @@ export class FoundryDataAccess {
   /**
    * Add a save-attack feature (feat) to an existing D&D 5e actor.
    * Creates a single save Activity with damage and an optional area template.
-   *
-   * TODO: schema drift vs real Foundry 5.1.8 — fix in dedicated cleanup pass:
-   *   - activity.range      → { units: 'self', override: false }  (drop value/special)
-   *   - activity.description → {}  (not { chatFlavor: '' })
-   *   - consumption.spellSlot → true  (not false)
-   *   - activity.uses        → { spent: 0, recovery: [] }  (drop max)
-   *   - damage.parts scaling → { mode: '', number: 1 }  (add mode)
-   *   - activation           → no condition field
    */
   async addSaveFeatureToActor(data: {
     actorIdentifier: string;
@@ -7073,16 +7065,13 @@ export class FoundryDataAccess {
       }
 
       // 4. Generate activity ID
-      const activityId: string = foundry.utils.randomID(16);
+      const activityId: string = (foundry.utils as any).randomID(16);
 
-      // 5. Slug identifier with NFD normalisation, fallback "feature"
-      const identifier =
-        data.featureName
-          .normalize('NFD')
-          .replace(/[̀-ͯ]/g, '')
-          .toLowerCase()
-          .replace(/\s+/g, '-')
-          .replace(/[^a-z0-9-]/g, '') || 'feature';
+      // 5. Slug identifier
+      const identifier = slugify(data.featureName);
+
+      // 5a. Map emanation → radius (Foundry uses "radius" for radial emanations)
+      const mappedAreaType: string = data.areaType === 'emanation' ? 'radius' : data.areaType;
 
       // 6. Build item data — schema verified against dnd5e 5.1.8 real output
       const itemData = {
@@ -7110,25 +7099,24 @@ export class FoundryDataAccess {
               activation: {
                 type: data.activationType,
                 override: false,
-                condition: '',
               },
               consumption: {
                 scaling: { allowed: false },
-                spellSlot: false,
+                spellSlot: true,
                 targets: [],
               },
-              description: { chatFlavor: '' },
+              description: {},
               duration: { units: 'inst', concentration: false, override: false },
               effects: [],
-              range: { units: 'ft', override: false, value: '', special: '' },
-              uses: { spent: 0, recovery: [], max: '' },
+              range: { units: 'self', override: false },
+              uses: { spent: 0, recovery: [] },
               target: {
                 template: {
                   contiguous: false,
                   units: data.areaUnits,
                   count: '',
-                  type: data.areaType,
-                  size: data.areaType ? String(data.areaSize) : '',
+                  type: mappedAreaType,
+                  size: mappedAreaType ? String(data.areaSize) : '',
                 },
                 affects: {
                   choice: false,
@@ -7147,7 +7135,7 @@ export class FoundryDataAccess {
                   denomination: p.denomination,
                   bonus: '',
                   types: [p.type],
-                  scaling: { number: 1 },
+                  scaling: { mode: '', number: 1 },
                 })),
               },
               save: {
@@ -7650,16 +7638,10 @@ export class FoundryDataAccess {
       // 5. Generate activity ID
       const activityId: string = (foundry.utils as any).randomID(16);
 
-      // 6. Slug identifier (NFD normalisation → lowercase → hyphenated)
-      const identifier =
-        (data.featureName as string)
-          .normalize('NFD')
-          .replace(/[̀-ͯ]/g, '')
-          .toLowerCase()
-          .replace(/\s+/g, '-')
-          .replace(/[^a-z0-9-]/g, '') || 'feature';
+      // 6. Slug identifier
+      const identifier = slugify(data.featureName as string);
 
-      // 6. Build item data — schema verified against dnd5e 5.1.8 Banshee Wail
+      // 7. Build item data — schema verified against dnd5e 5.1.8 Banshee Wail
       const itemData = {
         name: data.featureName,
         type: 'feat',
@@ -7808,13 +7790,7 @@ export class FoundryDataAccess {
       }
 
       // 3. Slug identifier
-      const identifier =
-        (data.featureName as string)
-          .normalize('NFD')
-          .replace(/[̀-ͯ]/g, '')
-          .toLowerCase()
-          .replace(/\s+/g, '-')
-          .replace(/[^a-z0-9-]/g, '') || 'feature';
+      const identifier = slugify(data.featureName as string);
 
       // 4. Build item data — no activities, no activityId needed
       const itemData = {
@@ -8585,6 +8561,21 @@ export class FoundryDataAccess {
     }
   }
 
+}
+
+// =============================================================================
+// Shared dnd5e helpers
+// =============================================================================
+
+function slugify(name: string, fallback = 'feature'): string {
+  return (
+    name
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '') || fallback
+  );
 }
 
 // =============================================================================
