@@ -1,40 +1,107 @@
+# Foundry VTT MCP Bridge — D&D 5e NPC Creation Suite (Fork)
+
+> **This is a fork of [adambdooley/foundry-vtt-mcp](https://github.com/adambdooley/foundry-vtt-mcp).**
+> It extends the original project with **8 new MCP tools** for building D&D 5e NPCs directly from Claude Desktop — no Foundry UI required.
+> See the [What's New in This Fork](#whats-new-in-this-fork) section below.
+
+---
+
 # Foundry VTT MCP Bridge
 
-Connect Foundry VTT to Claude Desktop for AI-powered campaign management through the Model Context Protocol (MCP). It currently supports Dungeons and Dragons Fifth Edition, Pathfinder Second Edition, Das Schwarze Augen Fifth Edition, & Cosmere RPG System. The majority of MCP tools are system agnostic or have features that are aware of the system it is working with, excluding some DSA 5 specific tools. 
+Connect Foundry VTT to Claude Desktop for AI-powered campaign management through the Model Context Protocol (MCP). It currently supports Dungeons and Dragons Fifth Edition, Pathfinder Second Edition, Das Schwarze Augen Fifth Edition, & Cosmere RPG System. The majority of MCP tools are system agnostic or have features that are aware of the system it is working with, excluding some DSA 5 specific tools.
+
+---
+
+## What's New in This Fork
+
+This fork adds a **D&D 5e NPC Creation Suite** — 8 new MCP tools that allow Claude to build complete, playable NPCs from scratch through natural conversation, without opening Foundry at all.
+
+### New Tools
+
+| Tool | Description |
+|------|-------------|
+| `dnd5e-create-npc` | Create an NPC actor from scratch with a full stat block (HP, AC, abilities, CR, etc.) |
+| `dnd5e-add-passive-feature` | Add descriptive traits: Multiattack, Sunlight Sensitivity, Pack Tactics, etc. |
+| `dnd5e-add-feature-with-save` | Add saving throw features with damage (e.g. Dragon Breath, cone AoE) |
+| `dnd5e-add-attack-feature` | Add a standard weapon attack with attack roll (type A) |
+| `dnd5e-add-attack-with-save` | Add an attack that triggers a secondary saving throw on hit (type B) |
+| `dnd5e-add-aura-feature` | Add an automatic-damage aura or emanation (no save required) |
+| `dnd5e-set-actor-spellcasting` | Configure spellcasting class, ability score, and spell slots |
+| `dnd5e-add-spells-to-actor` | Import spells by name from official compendium packs |
+
+### How It Works
+
+Each tool follows the same 4-layer architecture as the rest of the project:
+
+1. **`mcp-server/src/tools/dnd5e/`** — Zod schema, JSON Schema, tool description with USE/DON'T USE routing
+2. **`mcp-server/src/backend.ts`** — registration and handler routing
+3. **`foundry-module/src/queries.ts`** — query handler + registration
+4. **`foundry-module/src/data-access.ts`** — Foundry data layer
+
+All tools were verified against the real Foundry VTT 5e data schema (not just the TypeScript types) and tested end-to-end via Claude Desktop.
+
+### Example Workflow
+
+Build a complete NPC in ~5 minutes from a description:
+
+```
+1. "Create Frater Velreth, a corrupted monk, CR 8, 110 HP, AC 16"
+   → dnd5e-create-npc
+
+2. "Add Multiattack: two Corrupting Touch attacks"
+   → dnd5e-add-passive-feature
+
+3. "Add Corrupting Touch: melee 5ft, +7 to hit, 2d8 psychic,
+    secondary WIS save DC 14 or 3d6 extra"
+   → dnd5e-add-attack-with-save
+
+4. "Add Signal Aura: 10ft radius, 1d6 psychic automatic each turn"
+   → dnd5e-add-aura-feature
+
+5. "Make him a CHA-based caster, 5th level"
+   → dnd5e-set-actor-spellcasting
+
+6. "Give him Disguise Self, Mirror Image, Hypnotic Pattern, Major Image"
+   → dnd5e-add-spells-to-actor
+```
+
+### Known Limitations
+
+- **`dnd5e-add-feature-with-save` has schema drift**: ~6 minor mismatches between the Zod schema and the real Foundry 5e data model (annotated as TODO in source). The tool works in practice — no visible breakage — but a cleanup pass is planned.
+- **`emanation` area type**: may need verification in `add-feature-with-save` (confirmed correct in `add-aura-feature`).
+- Tool descriptions use explicit **negative routing** (`DO NOT USE THIS FOR`) to help Claude choose the right tool in ambiguous cases. If you notice routing mistakes, check the `description` field in the relevant `.ts` file first.
+
+---
 
 ## Overview
 
 The Foundry MCP Bridge enables natural AI conversations with your Foundry VTT game data:
 
-- **Quest Creation**: [Create quests from prompts that incorporate what exists in your world and journals](https://www.youtube.com/watch?v=NqyB_z2AKME)
-- **Character Management**: Query character stats, abilities, and information
-- **Compendium Search**: Find items, spells, and creatures using natural language
-- **Content Creation**: Generate actors, NPCs, and quest journals from simple prompts
-- **Scene Information**: Access current scene data and world details
-- **Dice Coordination**: Interactive roll requests with player targeting
-- **Campaign Management**: Multi-part quest and campaign tracking
-- **Map Generation**: Create maps from prompts and automatically upload them into scenes in Foundry VTT using the optional ComfyUI component
+* **Quest Creation**: [Create quests from prompts that incorporate what exists in your world and journals](https://www.youtube.com/watch?v=NqyB_z2AKME)
+* **Character Management**: Query character stats, abilities, and information
+* **Compendium Search**: Find items, spells, and creatures using natural language
+* **Content Creation**: Generate actors, NPCs, and quest journals from simple prompts
+* **Scene Information**: Access current scene data and world details
+* **Dice Coordination**: Interactive roll requests with player targeting
+* **Campaign Management**: Multi-part quest and campaign tracking
+* **Map Generation**: Create maps from prompts and automatically upload them into scenes in Foundry VTT using the optional ComfyUI component
 
-This project was built with the assistance of Claude Code. If you like this project, consider [supporting it on Patreon](https://www.patreon.com/c/Adambdooley).
+This project was built with the assistance of Claude Code. If you like the original project, consider [supporting it on Patreon](https://www.patreon.com/c/Adambdooley).
 
 ## Installation
 
 ### Prerequisites
 
-- **Foundry VTT v13 or v14**
-- **Claude Desktop** with MCP support
-- **Windows** (for automated installer) or **Node.js 18+** for manual installation
+* **Foundry VTT v13**
+* **Claude Desktop** with MCP support
+* **Windows** (for automated installer) or **Node.js 18+** for manual installation
 
 ### Option 1: Windows Installer
 
 [Video guide for Windows Installer](https://youtu.be/Se04A21wrbE)
 
 1. Download the latest `FoundryMCPServer-Setup-vx.x.x.exe` from [Releases](https://github.com/adambdooley/foundry-vtt-mcp/releases)
-2. Run the installer - it will:
-   - Install the MCP server with bundled Node.js runtime
-   - Configure the Claude Desktop MCP server settings
-   - Optionally install the Foundry module and ComfyUI Map Generation to your VTT installation
-   - Choose Cuda version for your GPU type during install
+2. Run the installer
 3. Restart Claude Desktop
 4. Enable "Foundry MCP Bridge" in your Foundry Module Management
 
@@ -48,28 +115,29 @@ This project was built with the assistance of Claude Code. If you like this proj
 3.  Restart Claude Desktop
 4.  Enable "Foundry MCP Bridge" in your Foundry Module Management
 
-### Option 3: Manual Installation
-
-#### Install the Foundry Module
-
-1. Open Foundry VTT (v13 or v14)
-2. Select install module in the Foundry Add-ons menu
-3. At the bottom of the window, add the Manifest URL as: https://github.com/adambdooley/foundry-vtt-mcp/blob/master/packages/foundry-module/module.json and click install
-4. Enable "Foundry MCP Bridge" in Module Management
-   - **Do not change the module ID or folder name.** The MCP backend and the Claude integration both expect the module to live in a directory called `foundry-mcp-bridge`. Renaming the ID in `module.json` breaks socket routing and stops Claude from seeing the backend.
+### Option 3: Manual Installation (required for this fork)
 
 #### Install the MCP Server
 
 ```bash
-# Clone repository
-git clone https://github.com/adambdooley/foundry-vtt-mcp.git
+# Clone this fork
+git clone https://github.com/YOUR_USERNAME/foundry-vtt-mcp.git
 cd foundry-vtt-mcp
 
 # Install dependencies and build
 npm install
 npm run build
+```
+
+#### Deploy the Foundry Module
+
+Copy `packages/foundry-module/dist/` to your Foundry modules directory:
 
 ```
+AppData/Local/FoundryVTT/Data/modules/foundry-mcp-bridge/dist/
+```
+
+> ⚠️ **Do not change the module ID or folder name.** The MCP backend and the Claude integration both expect the module to live in a directory called `foundry-mcp-bridge`.
 
 #### Configure Claude Desktop
 
@@ -90,7 +158,7 @@ Add this to your Claude Desktop configuration (claude_desktop_config.json) file:
 }
 ```
 
-Starting Claude Desktop will start the MCP Server.
+#### After any code change
 
 > **Windows Store / MSIX installs:** If you installed Claude Desktop from the Microsoft Store, it reads its config from a virtualised path, not `%APPDATA%\Claude\`. Edit `claude_desktop_config.json` here instead:
 > `%LOCALAPPDATA%\Packages\<...Claude...>\LocalCache\Roaming\Claude\claude_desktop_config.json`
@@ -209,24 +277,18 @@ Claude Desktop ↔ MCP Protocol ↔ MCP Server ↔ WebSocket ↔ Foundry Module 
                               (AI Map Generation)
 ```
 
-- **Foundry Module**: Provides secure data access within Foundry VTT
-- **MCP Server**: External Node.js server handling Claude Desktop communication
-- **Map Generation Service**: A headless ComfyUI backend that is spawned by Claude Desktop
-- **No API Keys Required**: Uses your existing Claude Desktop subscription
-
 ## Security & Permissions
 
-- **GM-Only Access**: All functionality restricted to Game Master users
-- **Configurable Permissions**: Control what data Claude can access and modify
-- **Session-Based Authentication**: Uses Foundry's built-in authentication system
+* **GM-Only Access**: All functionality restricted to Game Master users
+* **Configurable Permissions**: Control what data Claude can access and modify
+* **Session-Based Authentication**: Uses Foundry's built-in authentication system
 
 ## System Requirements
 
-- **Foundry VTT**: Version 13
-- **Claude Desktop**: Latest version with MCP support
-- **Claude Pro/Max Plan**: Required to connect to MCP servers
-- **Operating System**: Windows 10/11 (installer), or other OSes/manual Windows install with Node.js 18+ (manual)
-- **GPU Requirements**: A GPU with at least 8GB of VRAM
+* **Foundry VTT**: Version 13
+* **Claude Desktop**: Latest version with MCP support
+* **Claude Pro/Max Plan**: Required to connect to MCP servers
+* **Operating System**: Windows 10/11 or other OSes with Node.js 18+
 
 ## Schema Smoke Test
 
@@ -237,9 +299,9 @@ npm -w @foundry-mcp/server run build
 npm run test:mcp:schema
 ```
 
+
 ## Support & Development
 
-- **Issues**: Report bugs on [GitHub Issues](https://github.com/adambdooley/foundry-vtt-mcp/issues)
-- **YouTube Channel**: [Subscribe for updates and tutorials](https://www.youtube.com/channel/UCVrSC-FzuAk5AgvfboJj0WA)
-- **Documentation**: Built with TypeScript, comprehensive documentation included
-- **License**: MIT License (Additional Third Party licenses are included for bundled components for the installers)
+* **Original project issues**: [GitHub Issues (upstream)](https://github.com/adambdooley/foundry-vtt-mcp/issues)
+* **Fork-specific issues**: Open an issue on this repository
+* **License**: MIT

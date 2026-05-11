@@ -38,6 +38,16 @@ import { TokenManipulationTools } from './tools/token-manipulation.js';
 
 import { DSA5CharacterCreator } from './systems/dsa5/character-creator.js';
 
+import { DnD5eFeatureTools } from './tools/dnd5e/feature.js';
+import { DnD5eNpcTools } from './tools/dnd5e/npc.js';
+import { DnD5eAttackTools } from './tools/dnd5e/attack.js';
+import { DnD5eAuraTools } from './tools/dnd5e/aura.js';
+import { DnD5ePassiveTools } from './tools/dnd5e/passive.js';
+import { DnD5eAttackWithSaveTools } from './tools/dnd5e/attack-with-save.js';
+import { DnD5eSpellcastingTools } from './tools/dnd5e/spellcasting.js';
+import { DnD5eSpellsTools } from './tools/dnd5e/spells.js';
+import { DnD5eFeaturesFromCompendiumTools } from './tools/dnd5e/features.js';
+
 const CONTROL_HOST = '127.0.0.1';
 
 const CONTROL_PORT = 31414;
@@ -1184,6 +1194,16 @@ async function startBackend(): Promise<void> {
 
   const dsa5CharacterCreator = new DSA5CharacterCreator({ foundryClient, logger });
 
+  const dnd5eFeatureTools = new DnD5eFeatureTools({ foundryClient, logger });
+  const dnd5eNpcTools = new DnD5eNpcTools({ foundryClient, logger });
+  const dnd5eAttackTools = new DnD5eAttackTools({ foundryClient, logger });
+  const dnd5eAuraTools    = new DnD5eAuraTools({ foundryClient, logger });
+  const dnd5ePassiveTools       = new DnD5ePassiveTools({ foundryClient, logger });
+  const dnd5eAttackWithSaveTools = new DnD5eAttackWithSaveTools({ foundryClient, logger });
+  const dnd5eSpellcastingTools   = new DnD5eSpellcastingTools({ foundryClient, logger });
+  const dnd5eSpellsTools                = new DnD5eSpellsTools({ foundryClient, logger });
+  const dnd5eFeaturesFromCompendiumTools = new DnD5eFeaturesFromCompendiumTools({ foundryClient, logger });
+
   const questCreationTools = new QuestCreationTools({ foundryClient, logger });
 
   const diceRollTools = new DiceRollTools({ foundryClient, logger });
@@ -1401,6 +1421,16 @@ async function startBackend(): Promise<void> {
 
     ...dsa5CharacterCreator.getToolDefinitions(),
 
+    ...dnd5eFeatureTools.getToolDefinitions(),
+    ...dnd5eNpcTools.getToolDefinitions(),
+    ...dnd5eAttackTools.getToolDefinitions(),
+    ...dnd5eAuraTools.getToolDefinitions(),
+    ...dnd5ePassiveTools.getToolDefinitions(),
+    ...dnd5eAttackWithSaveTools.getToolDefinitions(),
+    ...dnd5eSpellcastingTools.getToolDefinitions(),
+    ...dnd5eSpellsTools.getToolDefinitions(),
+    ...dnd5eFeaturesFromCompendiumTools.getToolDefinitions(),
+
     ...questCreationTools.getToolDefinitions(),
 
     ...diceRollTools.getToolDefinitions(),
@@ -1564,6 +1594,62 @@ async function startBackend(): Promise<void> {
 
                 case 'list-dsa5-archetypes':
                   result = await dsa5CharacterCreator.handleListArchetypes(args);
+
+                  break;
+
+                // D&D 5e tools
+
+                case 'dnd5e-add-feature-with-save':
+
+                  result = await dnd5eFeatureTools.handleAddFeatureWithSave(args);
+
+                  break;
+
+                case 'dnd5e-create-npc':
+
+                  result = await dnd5eNpcTools.handleCreateNpc(args);
+
+                  break;
+
+                case 'dnd5e-add-attack-feature':
+
+                  result = await dnd5eAttackTools.handleAddAttackFeature(args);
+
+                  break;
+
+                case 'dnd5e-add-aura-feature':
+
+                  result = await dnd5eAuraTools.handleAddAuraFeature(args);
+
+                  break;
+
+                case 'dnd5e-add-passive-feature':
+
+                  result = await dnd5ePassiveTools.handleAddPassiveFeature(args);
+
+                  break;
+
+                case 'dnd5e-add-attack-with-save':
+
+                  result = await dnd5eAttackWithSaveTools.handleAddAttackWithSave(args);
+
+                  break;
+
+                case 'dnd5e-set-actor-spellcasting':
+
+                  result = await dnd5eSpellcastingTools.handleSetActorSpellcasting(args);
+
+                  break;
+
+                case 'dnd5e-add-spells-to-actor':
+
+                  result = await dnd5eSpellsTools.handleAddSpellsToActor(args);
+
+                  break;
+
+                case 'dnd5e-add-features-from-compendium':
+
+                  result = await dnd5eFeaturesFromCompendiumTools.handleAddFeaturesFromCompendium(args);
 
                   break;
 
