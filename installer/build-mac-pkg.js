@@ -65,6 +65,21 @@ console.log('📁 Cleaning build directory...');
   }
 });
 
+// Shared snippet for postinstall scripts: resolve the logged-in GUI user.
+// The installer runs as root, and `stat /dev/console` can return root/empty
+// under non-GUI installs (CLI `installer`, MDM, SSH); fall back to scutil's
+// ConsoleUser before giving up so the config lands in the right home dir.
+const resolveUserSnippet = `# Resolve the logged-in GUI user (installer runs as root)
+CURRENT_USER=$(stat -f '%Su' /dev/console 2>/dev/null)
+if [ -z "$CURRENT_USER" ] || [ "$CURRENT_USER" = "root" ] || [ "$CURRENT_USER" = "loginwindow" ]; then
+  CURRENT_USER=$(scutil <<< "show State:/Users/ConsoleUser" 2>/dev/null | awk '/Name :/ && ! /loginwindow/ { print $3 }')
+fi
+if [ -z "$CURRENT_USER" ] || [ "$CURRENT_USER" = "root" ]; then
+  echo "⚠️  Could not determine the logged-in user; skipping."
+  exit 0
+fi
+USER_HOME=$(eval echo ~$CURRENT_USER)`;
+
 // ============================================================================
 // COMPONENT 1: Core MCP Server (Required)
 // ============================================================================
@@ -110,11 +125,9 @@ fs.mkdirSync(coreScripts, { recursive: true });
 
 const corePostinstall = `#!/bin/bash
 # Core MCP Server postinstall - Configures Claude Desktop
+# Best-effort: never abort the whole install on a non-critical failure.
 
-set -e
-
-CURRENT_USER=$(stat -f '%Su' /dev/console)
-USER_HOME=$(eval echo ~$CURRENT_USER)
+${resolveUserSnippet}
 
 echo "Configuring Claude Desktop for user: $CURRENT_USER"
 
@@ -123,21 +136,50 @@ CLAUDE_CONFIG="$CLAUDE_CONFIG_DIR/claude_desktop_config.json"
 MCP_SERVER_DIR="$USER_HOME/Library/Application Support/FoundryMCPServer"
 SERVER_PATH="/Applications/FoundryMCPServer.app/Contents/Resources/foundry-mcp-server/index.cjs"
 
-# Create Claude config directory
-mkdir -p "$CLAUDE_CONFIG_DIR"
-chown "$CURRENT_USER:staff" "$CLAUDE_CONFIG_DIR"
+mkdir -p "$CLAUDE_CONFIG_DIR" && chown "$CURRENT_USER:staff" "$CLAUDE_CONFIG_DIR"
+mkdir -p "$MCP_SERVER_DIR" && chown "$CURRENT_USER:staff" "$MCP_SERVER_DIR"
 
-# Create MCP Server directory for logs
-mkdir -p "$MCP_SERVER_DIR"
-chown "$CURRENT_USER:staff" "$MCP_SERVER_DIR"
-
-# Backup existing config
+# Backup existing config before any change
 if [ -f "$CLAUDE_CONFIG" ]; then
   cp "$CLAUDE_CONFIG" "$CLAUDE_CONFIG.backup.$(date +%s)"
 fi
 
-# Write Claude config
-cat > "$CLAUDE_CONFIG" <<EOF
+# Locate node so we can MERGE into an existing config (preserving other MCP servers)
+NODE_PATH=""
+for c in /usr/local/bin/node /opt/homebrew/bin/node; do
+  [ -x "$c" ] && NODE_PATH="$c" && break
+done
+[ -z "$NODE_PATH" ] && command -v node >/dev/null 2>&1 && NODE_PATH=$(command -v node)
+
+MERGED=0
+if [ -n "$NODE_PATH" ]; then
+  CLAUDE_CONFIG="$CLAUDE_CONFIG" SERVER_PATH="$SERVER_PATH" "$NODE_PATH" <<'NODE_EOF'
+const fs = require('fs');
+const cfgPath = process.env.CLAUDE_CONFIG;
+const serverPath = process.env.SERVER_PATH;
+let cfg = {};
+try {
+  if (fs.existsSync(cfgPath)) cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+} catch (e) {
+  cfg = {}; // corrupt/unreadable: start fresh (a .backup was already made)
+}
+if (!cfg || typeof cfg !== 'object') cfg = {};
+if (!cfg.mcpServers || typeof cfg.mcpServers !== 'object') cfg.mcpServers = {};
+cfg.mcpServers['foundry-mcp'] = {
+  command: 'node',
+  args: [serverPath],
+  env: { FOUNDRY_HOST: 'localhost', FOUNDRY_PORT: '31415' },
+};
+fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+NODE_EOF
+  [ $? -eq 0 ] && MERGED=1
+fi
+
+if [ "$MERGED" -eq 1 ]; then
+  echo "✅ Merged foundry-mcp into Claude config (existing servers preserved)"
+else
+  echo "ℹ️  node unavailable for merge - writing a fresh Claude config"
+  cat > "$CLAUDE_CONFIG" <<EOF
 {
   "mcpServers": {
     "foundry-mcp": {
@@ -153,6 +195,7 @@ cat > "$CLAUDE_CONFIG" <<EOF
   }
 }
 EOF
+fi
 
 chown "$CURRENT_USER:staff" "$CLAUDE_CONFIG"
 chmod 644 "$CLAUDE_CONFIG"
@@ -220,42 +263,40 @@ fs.mkdirSync(foundryScripts, { recursive: true });
 
 const foundryPostinstall = `#!/bin/bash
 # Foundry Module postinstall - Installs module to Foundry VTT
+# Best-effort: never abort the whole install on a non-critical failure.
 
-set -e
-
-CURRENT_USER=$(stat -f '%Su' /dev/console)
-USER_HOME=$(eval echo ~$CURRENT_USER)
+${resolveUserSnippet}
 
 echo "Installing Foundry MCP Bridge module..."
 
 MODULE_SOURCE="/Applications/FoundryMCPServer.app/Contents/Resources/foundry-module"
 
-# Try to find Foundry VTT installation
+# Try common Foundry VTT data locations
 FOUNDRY_PATHS=(
   "$USER_HOME/Library/Application Support/FoundryVTT/Data/modules"
+  "$USER_HOME/Documents/FoundryVTT/Data/modules"
   "$USER_HOME/FoundryVTT/Data/modules"
+  "$USER_HOME/.local/share/FoundryVTT/Data/modules"
   "/Applications/FoundryVTT/Data/modules"
 )
 
+INSTALLED=0
 for FOUNDRY_PATH in "\${FOUNDRY_PATHS[@]}"; do
   if [ -d "$FOUNDRY_PATH" ]; then
     MODULE_DEST="$FOUNDRY_PATH/foundry-mcp-bridge"
-
-    # Remove old version
-    if [ -d "$MODULE_DEST" ]; then
-      rm -rf "$MODULE_DEST"
+    rm -rf "$MODULE_DEST"
+    if cp -R "$MODULE_SOURCE" "$MODULE_DEST"; then
+      chown -R "$CURRENT_USER:staff" "$MODULE_DEST"
+      echo "✅ Foundry module installed to: $MODULE_DEST"
+      INSTALLED=1
+      break
     fi
-
-    # Copy module
-    cp -R "$MODULE_SOURCE" "$MODULE_DEST"
-    chown -R "$CURRENT_USER:staff" "$MODULE_DEST"
-
-    echo "✅ Foundry module installed to: $MODULE_DEST"
-    exit 0
   fi
 done
 
-echo "ℹ️  Foundry VTT not detected - module will be installed on first connection"
+if [ "$INSTALLED" -ne 1 ]; then
+  echo "ℹ️  Foundry VTT data folder not found - the module will install on first connection"
+fi
 exit 0
 `;
 
@@ -310,11 +351,9 @@ fs.mkdirSync(comfyuiScripts, { recursive: true });
 
 const comfyuiPostinstall = `#!/bin/bash
 # ComfyUI postinstall - Downloads and installs ComfyUI + AI models
+# Best-effort: never abort the whole install on a non-critical failure.
 
-set -e
-
-CURRENT_USER=$(stat -f '%Su' /dev/console)
-USER_HOME=$(eval echo ~$CURRENT_USER)
+${resolveUserSnippet}
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
