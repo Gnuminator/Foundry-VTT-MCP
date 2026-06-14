@@ -204,9 +204,51 @@ export class EventTracker {
         }
       });
 
+      // Seed HP / resource caches once the world is ready so the FIRST damage,
+      // heal, death, or resource-spend of the session is detected (otherwise the
+      // first updateActor has no baseline to diff against and is dropped).
+      Hooks.once('ready', () => {
+        try {
+          this.seedCaches();
+        } catch (error) {
+          console.warn(`[${MODULE_ID}] EventTracker seedCaches failed:`, error);
+        }
+      });
+
       console.log(`[${MODULE_ID}] EventTracker hooks registered`);
     } catch (error) {
       console.error(`[${MODULE_ID}] Failed to register EventTracker hooks:`, error);
+    }
+  }
+
+  /** Seed the HP and resource caches from current actor state. */
+  private seedCaches(): void {
+    const actors = (game.actors as any)?.contents ?? game.actors ?? [];
+    for (const actor of actors) {
+      try {
+        const sys = actor.system;
+        const hp = sys?.attributes?.hp?.value;
+        if (typeof hp === 'number') this.hpCache.set(actor.id, hp);
+
+        const spells = sys?.spells;
+        if (spells) {
+          for (const [key, value] of Object.entries(spells as Record<string, any>)) {
+            if (typeof value?.value === 'number') {
+              this.resourceCache.set(`${actor.id}:spells.${key}`, value.value);
+            }
+          }
+        }
+        const resources = sys?.resources;
+        if (resources) {
+          for (const [key, value] of Object.entries(resources as Record<string, any>)) {
+            if (typeof value?.value === 'number') {
+              this.resourceCache.set(`${actor.id}:resources.${key}`, value.value);
+            }
+          }
+        }
+      } catch {
+        // skip this actor
+      }
     }
   }
 
@@ -297,7 +339,9 @@ export class EventTracker {
     if (isWhisper) return 'whisper';
 
     const CMS: any = (CONST as any).CHAT_MESSAGE_STYLES || (CONST as any).CHAT_MESSAGE_TYPES || {};
-    const style = message.style ?? message.type;
+    // Use `style` only: in Foundry v13 `message.type` is the document subtype
+    // (a string), not the numeric chat style, so reading it would misclassify.
+    const style = message.style;
 
     if (style === CMS.IC) return 'ic';
     if (style === CMS.EMOTE) return 'emote';

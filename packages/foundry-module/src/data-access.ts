@@ -5511,6 +5511,13 @@ export class FoundryDataAccess {
     const currentUserId = game.user?.id;
     const isGM = game.user?.isGM;
 
+    // Diagnostic: confirms the render hook reached us and how many buttons it saw.
+    // If a player clicks and nothing happens, check the console for this line:
+    // absent => the renderChatMessageHTML hook never attached handlers on their client.
+    console.debug(
+      `[${MODULE_ID}] attachRollButtonHandlers: ${html.find('.mcp-roll-button').length} button(s) for user "${game.user?.name}" (GM=${isGM})`
+    );
+
     // Note: Roll state restoration now handled by ChatMessage content, not DOM manipulation
 
     // Handle button visibility and styling based on permissions and public/private status
@@ -8798,9 +8805,11 @@ export class FoundryDataAccess {
       actor = this.findActorByIdentifier(data.speakerActorName);
     }
 
+    // getSpeaker takes {scene, actor, token, alias} — NOT {user}. For the
+    // GM/world voice, set the alias explicitly to the current user's name.
     const speaker = actor
       ? (ChatMessage as any).getSpeaker({ actor })
-      : (ChatMessage as any).getSpeaker({ user: game.user });
+      : (ChatMessage as any).getSpeaker({ alias: game.user?.name });
 
     const type = (data.messageType || 'ic').toLowerCase();
     const CMS: any = (CONST as any).CHAT_MESSAGE_STYLES || (CONST as any).CHAT_MESSAGE_TYPES || {};
@@ -8813,13 +8822,24 @@ export class FoundryDataAccess {
     let content = data.message;
     if (type === 'emote') content = `<em>${data.message}</em>`;
 
+    let warning: string | null = null;
     const whisper: string[] = [];
-    if (type === 'whisper' && Array.isArray(data.whisperTargets)) {
-      for (const name of data.whisperTargets) {
+    if (type === 'whisper') {
+      for (const name of Array.isArray(data.whisperTargets) ? data.whisperTargets : []) {
         const user = game.users?.find(
           (u: any) => u.name?.toLowerCase() === String(name).toLowerCase()
         );
         if (user?.id) whisper.push(user.id);
+      }
+      // SAFETY: never let a "whisper" become a public message. If no targets
+      // resolved, fall back to whispering to the GM(s) and report it.
+      if (whisper.length === 0) {
+        const gmIds = (game.users?.filter((u: any) => u.isGM) ?? [])
+          .map((u: any) => u.id)
+          .filter(Boolean);
+        whisper.push(...gmIds);
+        warning =
+          'No whisper targets resolved; message was whispered to the GM(s) to avoid posting it publicly.';
       }
     }
 
@@ -8833,7 +8853,8 @@ export class FoundryDataAccess {
       messageId: created?.id ?? null,
       speaker: speaker?.alias ?? null,
       messageType: type,
-      whisperedTo: whisper.length > 0 ? data.whisperTargets : [],
+      whisperedTo: whisper.length > 0 ? (data.whisperTargets ?? []) : [],
+      ...(warning ? { warning } : {}),
     };
   }
 
@@ -9038,11 +9059,13 @@ export class FoundryDataAccess {
           if (Number.isFinite(itemMax) && newValue > itemMax) {
             throw new Error(`newValue ${newValue} exceeds max ${itemMax} for item "${item.name}"`);
           }
-          if (uses.value != null) {
-            await (item as any).update({ 'system.uses.value': newValue });
+          // dnd5e v3+ stores `spent` and exposes `value` as a derived,
+          // read-only getter (max - spent). Prefer writing `spent` when present
+          // so the update actually takes; fall back to `value` for legacy data.
+          if (uses.spent !== undefined && Number.isFinite(itemMax)) {
+            await (item as any).update({ 'system.uses.spent': Math.max(0, itemMax - newValue) });
           } else {
-            const spent = Number.isFinite(itemMax) ? Math.max(0, itemMax - newValue) : 0;
-            await (item as any).update({ 'system.uses.spent': spent });
+            await (item as any).update({ 'system.uses.value': newValue });
           }
           this.auditLog('updateCharacterResource', { ...data, type: 'item' }, 'success');
           return {
@@ -9113,7 +9136,10 @@ export class FoundryDataAccess {
     const effs = (actor.effects as any)?.contents ?? actor.effects ?? [];
     const effects = effs.map((e: any) => {
       const statuses: string[] = Array.from(e.statuses ?? []);
-      const isCondition = statuses.some(s => statusIds.has(s)) || statuses.length > 0;
+      // A condition is an effect whose status id is a registered game condition
+      // (CONFIG.statusEffects). Don't treat every status-bearing effect (e.g. a
+      // spell that applies "concentrating") as a condition.
+      const isCondition = statuses.some(s => statusIds.has(s));
       const dur = e.duration || {};
       const changes = (e.changes ?? []).map((c: any) => ({
         key: c.key,
@@ -9225,7 +9251,9 @@ export class FoundryDataAccess {
         name: c.name,
         initiative: c.initiative,
         isCurrentTurn: idx === currentIndex,
-        hasActed: (combat.round ?? 0) > 0 ? idx < currentIndex : false,
+        // True if this combatant has already taken its turn THIS round. The turn
+        // index resets to 0 each round, so `idx < currentIndex` holds per-round.
+        actedThisRound: combat.started ? idx < currentIndex : false,
         hp: hp ? { value: hp.value ?? null, max: hp.max ?? null, temp: hp.temp ?? 0 } : null,
         conditions: this.actorConditionNames(actor),
         isPC,
@@ -9374,6 +9402,7 @@ export class FoundryDataAccess {
     const toCenter = center(to);
 
     let distance: number | null = null;
+    let approximate = false;
 
     // Prefer Foundry's grid measurement when the scene is the one on the canvas
     try {
@@ -9398,7 +9427,10 @@ export class FoundryDataAccess {
       if (grid.type === 1 || grid.type === 0 || grid.type == null) {
         distance = Math.max(dx, dy) * unitsPerPixel;
       } else {
+        // Hex (types 2-5): a Euclidean approximation. True hex distance needs
+        // Foundry's grid math, which is only available for the on-canvas scene.
         distance = Math.hypot(dx, dy) * unitsPerPixel;
+        approximate = true;
       }
       distance = Math.round(distance);
     }
@@ -9409,6 +9441,7 @@ export class FoundryDataAccess {
       to: to.name,
       distance,
       units,
+      ...(approximate ? { approximate: true } : {}),
     };
   }
 

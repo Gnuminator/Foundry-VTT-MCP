@@ -25,6 +25,9 @@ beforeEach(() => {
     on: (name: string, cb: HookFn) => {
       (hooks[name] ??= []).push(cb);
     },
+    once: (_name: string, _cb: HookFn) => {
+      // no-op in tests; we don't fire 'ready' so seedCaches stays inert
+    },
   };
   (globalThis as any).CONST = {
     CHAT_MESSAGE_STYLES: { OTHER: 0, OOC: 1, IC: 2, EMOTE: 3 },
