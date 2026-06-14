@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Co-GM Dashboard</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🧠</text></svg>"
+    />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon">🧠</span>
+        <div>
+          <h1>Co-GM</h1>
+          <p class="subtitle" id="world-subtitle">Live AI dungeon master's assistant</p>
+        </div>
+      </div>
+
+      <div class="status-cluster">
+        <span class="status-pill" id="status-bridge">
+          <span class="dot dot-grey"></span> Bridge: connecting…
+        </span>
+        <span class="status-pill" id="status-foundry">
+          <span class="dot dot-grey"></span> Foundry: unknown
+        </span>
+        <span class="status-pill" id="status-ai"> <span class="dot dot-grey"></span> AI: … </span>
+      </div>
+
+      <div class="controls">
+        <button id="btn-pause" class="btn" title="Pause / resume auto commentary">⏸ Pause</button>
+        <label class="control-label">
+          Tone
+          <select id="select-tone" class="select">
+            <option value="tactical">Tactical</option>
+            <option value="narrative">Narrative</option>
+          </select>
+        </label>
+        <label class="control-label">
+          Model
+          <select id="select-model" class="select">
+            <option value="claude-opus-4-8">Opus 4.8</option>
+            <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+            <option value="claude-haiku-4-5">Haiku 4.5</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <main class="panes">
+      <!-- Combat tracker -->
+      <section class="pane" id="pane-combat">
+        <div class="pane-head">
+          <h2>Combat Tracker</h2>
+          <span class="pane-meta" id="combat-meta">—</span>
+        </div>
+        <div class="pane-body" id="combat-body">
+          <p class="empty">No active combat.</p>
+        </div>
+      </section>
+
+      <!-- Event feed -->
+      <section class="pane" id="pane-feed">
+        <div class="pane-head">
+          <h2>Live Feed</h2>
+          <span class="pane-meta" id="feed-meta">0 events</span>
+        </div>
+        <div class="pane-body" id="feed-body">
+          <p class="empty">Waiting for events…</p>
+        </div>
+      </section>
+
+      <!-- AI commentary -->
+      <section class="pane" id="pane-ai">
+        <div class="pane-head">
+          <h2>Co-GM Commentary</h2>
+          <span class="pane-meta" id="ai-meta"></span>
+        </div>
+        <div class="pane-body" id="ai-body">
+          <p class="empty">The co-GM will chime in when something significant happens.</p>
+        </div>
+        <form class="ask-bar" id="ask-form">
+          <input
+            id="ask-input"
+            class="ask-input"
+            type="text"
+            placeholder="Ask the co-GM… (e.g. who's in trouble?)"
+            autocomplete="off"
+          />
+          <button class="btn btn-primary" type="submit">Ask</button>
+        </form>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
