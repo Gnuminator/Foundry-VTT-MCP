@@ -1,6 +1,6 @@
 # Foundry VTT MCP Bridge
 
-Connect Foundry VTT to Claude Desktop for AI-powered campaign management through the Model Context Protocol (MCP). It currently supports Dungeons and Dragons Fifth Edition, Pathfinder Second Edition, Das Schwarze Augen Fifth Edition, Cosmere RPG System, & Warhammer Fantasy Roleplay 4th Edition. The majority of MCP tools are system agnostic or have features that are aware of the system it is working with, excluding some DSA 5 specific tools. 
+Connect Foundry VTT to Claude Desktop for AI-powered campaign management through the Model Context Protocol (MCP). It currently supports Dungeons and Dragons Fifth Edition, Pathfinder Second Edition, Das Schwarze Augen Fifth Edition, Cosmere RPG System, & Warhammer Fantasy Roleplay 4th Edition. The majority of MCP tools are system agnostic or have features that are aware of the system it is working with, excluding some DSA 5 specific tools.
 
 ## Overview
 
@@ -113,7 +113,14 @@ Once connected, ask Claude Desktop:
 
 ## Features
 
-- **40 MCP Tools** that allow Claude to interact with Foundry
+- **56 MCP Tools** that allow Claude to interact with Foundry
+- **Combat Play-by-Play & Chat Log**: A live in-memory buffer of chat messages (rolls, damage, flavor, crit/fumble, advantage) plus a structured round-by-round combat summary
+- **In-Character Chat**: Post messages to Foundry chat as a specific character or the GM (ic/ooc/emote/whisper)
+- **Resource Tracking**: Clean, queryable spell slots, class resources (Ki, Rage, Sorcery Points…), item charges, concentration, hit dice, and death saves — with safe updates
+- **Active Effect & Condition Management**: Read all effects with durations and modifiers; clear expired or named conditions after a fight
+- **Initiative & Turn Tracker**: Read full combat state, advance turns, and set initiative
+- **Movement & Positioning**: Token positions on a scene and grid-aware distance measurement
+- **Session Event Log**: A persistent per-session memory of combats, HP changes, deaths, conditions, resources, scene changes, and journals
 - **D&D 5e NPC Creation Suite**: Build complete NPCs from prompts — stat block, attacks, saves, auras, and spellcasting
 - **WFRP4e Support**: Character reading for Warhammer Fantasy Roleplay 4e
 - **Character Management**: Access stats, abilities, inventory, and detailed entity information
@@ -171,6 +178,97 @@ Once connected, ask Claude Desktop:
 - **38** dnd5e-create-npc (D&D 5e Only)
 - **39** dnd5e-add-feature (D&D 5e Only)
 - **40** dnd5e-add-features-from-compendium (D&D 5e Only)
+- **41** get-chat-log
+- **42** get-combat-play-by-play
+- **43** send-chat-message
+- **44** get-character-resources
+- **45** update-character-resource
+- **46** get-active-effects
+- **47** clear-stale-conditions
+- **48** get-combat-state
+- **49** advance-combat-turn
+- **50** set-initiative
+- **51** get-token-positions
+- **52** measure-distance
+- **53** request-ability-check
+- **54** request-attack-roll
+- **55** roll-npc-check
+- **56** get-session-log
+
+## Combat, Chat & Session Tools (v0.9.0)
+
+These tools add chat-log access, combat play-by-play, resource/effect tracking,
+an initiative tracker, movement helpers, and a session memory layer. The chat-log
+and session-event buffers live in the Foundry module (browser memory) and are
+requested on demand by the MCP server over the existing WebRTC/WebSocket channel.
+
+### Chat log & play-by-play (3A)
+
+- **`get-chat-log`** — Buffered chat messages.
+  - Params: `limit` (int, default 50, max 200), `speakerName` (string, partial match), `messageType` (`roll` | `damage` | `all`), `sinceTimestamp` (ISO string).
+  - Returns: `{ success, count, messages: [{ id, timestamp, speakerName, actorId, messageType, isRoll, content, flavor, roll: { formula, total, dice:[{faces,results}], isCritical, isFumble, advantage }, damage: { total, types[] }, whisperTo[] }] }`.
+- **`get-combat-play-by-play`** — Structured summary of the current/most-recent combat.
+  - Params: none.
+  - Returns: `{ success, combatActive, totalRounds, rounds:[{ round, turns:[{ combatant, actions:[{ actor, summary, timestamp, rollTotal, damage }] }] }], significantEvents:[{ type, description, actor, timestamp }], summary:{ totalRounds, damageByActor:{ [actor]: total }, note } }`.
+- **`send-chat-message`** — Post a message as an actor or the GM.
+  - Params: `message` (required), `speakerActorId`, `speakerActorName`, `messageType` (`ic` | `ooc` | `emote` | `whisper`, default `ic`), `whisperTargets` (string[] of user names).
+  - Returns: `{ success, messageId, speaker, messageType, whisperedTo[] }`.
+
+### Resource tracking (3C)
+
+- **`get-character-resources`** — Limited-use resources for an actor.
+  - Params: `identifier` (name or ID).
+  - Returns: `{ success, actorId, actorName, system, spellSlots:{ levelN:{ max, current, expended }, pact? }, classResources:[{ key, label, max, current }], itemCharges:[{ itemName, charges, max, recharge }], concentration:{ active, spell, remaining }, hitDice:{ total, available, dieType }, deathSaves:{ successes, failures } | null }`.
+- **`update-character-resource`** — Update a single resource (validated to 0..max).
+  - Params: `identifier`, `resourceName` (e.g. `spell3`, `pact`, a class-resource label/key, or an item name), `newValue` (int).
+  - Returns: `{ success, actorId, actorName, resourceName, newValue, max }`.
+
+### Active effects / conditions (3D)
+
+- **`get-active-effects`** — All active effects on an actor.
+  - Params: `identifier`.
+  - Returns: `{ success, actorId, actorName, count, effects:[{ id, name, icon, disabled, isCondition, type, statuses[], duration:{ rounds, turns, seconds, remaining }, changes:[{ key, mode, value }], requiresConcentration }] }`.
+- **`clear-stale-conditions`** — Remove expired or listed conditions.
+  - Params: `identifier`, `conditionNames` (optional string[]). With no list, removes only expired conditions.
+  - Returns: `{ success, actorId, actorName, removedCount, removed[] }`.
+
+### Combat tracker (3E)
+
+- **`get-combat-state`** — Full current combat state.
+  - Params: none.
+  - Returns: `{ success, active, round, turn, current, combatants:[{ id, name, initiative, isCurrentTurn, hasActed, hp:{ value, max, temp }, conditions[], isPC, category, defeated, deathSaves }], downed[] }`.
+- **`advance-combat-turn`** — Advance to the next combatant, or jump to one.
+  - Params: `skipTo` (optional combatant name or actor ID).
+  - Returns: `{ success, round, turn, current }`.
+- **`set-initiative`** — Set/override a combatant's initiative.
+  - Params: `combatantName`, `initiative` (number).
+  - Returns: `{ success, combatant, initiative }`.
+
+### Movement & positioning (3F)
+
+- **`get-token-positions`** — Tokens on a scene.
+  - Params: `sceneId` (optional; defaults to active scene).
+  - Returns: `{ success, sceneId, sceneName, gridSize, gridDistance, gridUnits, tokenCount, tokens:[{ tokenId, name, actorId, x, y, gridX, gridY, elevation, category, hidden, hp:{ value, max }, conditions[] }] }`.
+- **`measure-distance`** — Distance between two tokens.
+  - Params: `fromTokenName`, `toTokenName`.
+  - Returns: `{ success, from, to, distance, units }`.
+
+### Extended roll requests / NPC rolls (3G)
+
+- **`request-ability-check`** — Post an ability-check button to a player (shows DC).
+  - Params: `targetPlayer`, `ability` (`str`/`dex`/`con`/`int`/`wis`/`cha`), `dc` (optional int), `isPublic` (bool), `reason` (optional).
+- **`request-attack-roll`** — Post a weapon/spell attack-roll button to a player.
+  - Params: `targetPlayer`, `weaponOrSpellName`, `isPublic` (bool).
+- **`roll-npc-check`** — Roll directly for an NPC and post the result.
+  - Params: `actorName`, `rollType` (`ability` | `save` | `skill` | `attack`), `rollTarget`, `isPublic` (bool).
+  - Returns: `{ success, actorName, rollType, rollTarget, formula, total, isPublic }`.
+
+### Session event log (3H)
+
+- **`get-session-log`** — Structured session memory.
+  - Params: `limit` (int, default 100), `eventType` (optional), `actorName` (optional).
+  - Returns: `{ success, count, events:[{ id, timestamp, eventType, actorName, actorId, description, details }] }`.
+  - Event types: `combat-start`, `combat-end`, `damage`, `damage-roll`, `healing`, `death`, `stabilize`, `condition-applied`, `condition-removed`, `resource-spent`, `scene-change`, `journal-created`, `journal-updated`.
 
 ## Settings
 
@@ -183,6 +281,7 @@ Once connected, ask Claude Desktop:
 - **Websocket Server Host** IP Address of Claude Desktop MCP Server location. Only used for local network websocket connections. Remote Servers use WebRT. Defaults to localhost.
 - **Allow Write Operations** This will prevent Claude from making any changes to world content and restrict it to reading only
 - **Max Actors Per Request** This is a failsafe to stop a massive amount of actors being created from one single request. It does not limit the amount of characters being created by multiple requests
+- **Chat Log Buffer Size** How many recent chat messages the module keeps in memory for the `get-chat-log` and `get-combat-play-by-play` tools (default 200)
 - **Show Connection Messages** This can turn off the banner messages for connections for Foundry MCP Bridge
 - **Auto-Reconnect on Disconnect** Will automatically attempt to reconnect if the connection is lost
 - **Connection Check Frequency** How often it will check connection status
