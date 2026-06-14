@@ -113,7 +113,7 @@ Once connected, ask Claude Desktop:
 
 ## Features
 
-- **68 MCP Tools** that allow Claude to interact with Foundry
+- **71 MCP Tools** that allow Claude to interact with Foundry
 - **Combat Resolution (v0.10)**: Apply damage/healing with resistance math, roll NPC saves/checks vs DC, run an NPC's attack/activity, roll NPC initiative, and run short/long rests — the AI can actually run a 5e round
 - **Encounter & Scene Control (v0.10)**: XP-budget encounter planning, AoE template placement (with who's-inside), scene mood (lighting/playlists), map pins, token vision/light, and loot awards
 - **Live situational awareness (v0.10)**: `get-recent-events` delta feed for "what just happened"
@@ -209,6 +209,9 @@ Once connected, ask Claude Desktop:
 - **66** add-map-note
 - **67** set-token-vision-light
 - **68** drop-loot
+- **69** delete-measured-template
+- **70** delete-map-note
+- **71** get-targets
 
 ## Combat Resolution & Scene Control (v0.10.0)
 
