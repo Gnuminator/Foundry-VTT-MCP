@@ -1,7 +1,7 @@
 import { MODULE_ID, ERROR_MESSAGES, TOKEN_DISPOSITIONS } from './constants.js';
 import { permissionManager } from './permissions.js';
 import { transactionManager } from './transaction-manager.js';
-import { eventTracker, type ChatLogEntry } from './event-tracking.js';
+import { eventTracker } from './event-tracking.js';
 // Local type definitions to avoid shared package import issues
 interface CharacterInfo {
   id: string;
@@ -8767,106 +8767,11 @@ export class FoundryDataAccess {
       (Array.from((game as any).combats ?? []) as any[]).slice(-1)[0] ||
       null;
 
-    const chat = eventTracker.getRawChatLog();
-    const timeline = eventTracker.getCombatTimeline();
-    const sessionEvents = eventTracker.getSessionLog({ limit: 1000 });
-
-    const combatStarts = sessionEvents.filter(e => e.eventType === 'combat-start');
-    const startMs = combatStarts.length
-      ? combatStarts[combatStarts.length - 1]!.timestampMs
-      : (timeline[0]?.timestampMs ?? 0);
-
-    const relevant = chat.filter(e => e.timestampMs >= startMs && (e.isRoll || e.damage !== null));
-
-    const summarizeAction = (e: ChatLogEntry) => {
-      const parts: string[] = [];
-      if (e.flavor) parts.push(e.flavor);
-      if (e.roll) {
-        let r = `rolled ${e.roll.total}`;
-        if (e.roll.isCritical) r += ' (CRIT!)';
-        if (e.roll.isFumble) r += ' (FUMBLE)';
-        if (e.roll.advantage) r += ` [${e.roll.advantage}]`;
-        parts.push(r);
-      }
-      if (e.damage) {
-        parts.push(
-          `${e.damage.total} ${e.damage.types.join('/')} damage`.replace(/\s+/g, ' ').trim()
-        );
-      }
-      return {
-        actor: e.speakerName,
-        summary: parts.join(' — '),
-        timestamp: e.timestamp,
-        rollTotal: e.roll?.total ?? null,
-        damage: e.damage?.total ?? null,
-      };
-    };
-
-    const roundMap = new Map<number, { round: number; turns: any[] }>();
-
-    const turnWindows = timeline
-      .filter(t => t.timestampMs >= startMs)
-      .map((t, i, arr) => ({
-        round: t.round,
-        turn: t.turn,
-        combatant: t.combatantName,
-        startMs: t.timestampMs,
-        endMs: arr[i + 1]?.timestampMs ?? Number.POSITIVE_INFINITY,
-      }));
-
-    if (turnWindows.length > 0) {
-      for (const w of turnWindows) {
-        const actions = relevant
-          .filter(e => e.timestampMs >= w.startMs && e.timestampMs < w.endMs)
-          .map(summarizeAction);
-        if (!roundMap.has(w.round)) roundMap.set(w.round, { round: w.round, turns: [] });
-        roundMap.get(w.round)!.turns.push({ combatant: w.combatant, actions });
-      }
-    } else {
-      const r = combat?.round ?? 1;
-      roundMap.set(r, {
-        round: r,
-        turns: [{ combatant: '(unattributed)', actions: relevant.map(summarizeAction) }],
-      });
-    }
-
-    const significantEvents = sessionEvents
-      .filter(
-        e =>
-          e.timestampMs >= startMs &&
-          ['death', 'stabilize', 'condition-applied', 'condition-removed'].includes(e.eventType)
-      )
-      .map(e => ({
-        type: e.eventType,
-        description: e.description,
-        actor: e.actorName,
-        timestamp: e.timestamp,
-      }));
-
-    const damageByActor: Record<string, number> = {};
-    for (const e of relevant) {
-      if (e.damage)
-        damageByActor[e.speakerName] = (damageByActor[e.speakerName] || 0) + e.damage.total;
-    }
-
-    const rounds = Array.from(roundMap.values()).sort((a, b) => a.round - b.round);
-    const totalRounds = combat?.round ?? rounds.length;
-
-    return {
-      success: true,
-      combatActive: !!(combat && combat.started),
-      totalRounds,
-      rounds,
-      significantEvents,
-      summary: {
-        totalRounds,
-        damageByActor,
-        note:
-          turnWindows.length === 0
-            ? 'No per-turn timeline was recorded for this combat (it may have started before the module loaded); actions are aggregated into a single round.'
-            : null,
-      },
-    };
+    // Synthesis lives in the (pure, unit-tested) EventTracker; we only pass the
+    // lightweight combat descriptor read from Foundry's live combat document.
+    return eventTracker.buildPlayByPlay(
+      combat ? { round: combat.round, started: combat.started } : null
+    );
   }
 
   /**
