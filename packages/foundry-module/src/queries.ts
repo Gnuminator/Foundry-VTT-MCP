@@ -130,15 +130,55 @@ export class QueryHandlers {
       this.handleGetAvailableConditions.bind(this);
 
     // D&D 5e queries
-    CONFIG.queries[`${modulePrefix}.addSaveFeatureToActor`] = this.handleAddSaveFeatureToActor.bind(this);
+    CONFIG.queries[`${modulePrefix}.addSaveFeatureToActor`] =
+      this.handleAddSaveFeatureToActor.bind(this);
     CONFIG.queries[`${modulePrefix}.createNpcActor`] = this.handleCreateNpcActor.bind(this);
     CONFIG.queries[`${modulePrefix}.addAttackToActor`] = this.handleAddAttackToActor.bind(this);
     CONFIG.queries[`${modulePrefix}.addAuraToActor`] = this.handleAddAuraToActor.bind(this);
-    CONFIG.queries[`${modulePrefix}.addPassiveFeatureToActor`] = this.handleAddPassiveFeatureToActor.bind(this);
-    CONFIG.queries[`${modulePrefix}.addAttackWithSaveToActor`] = this.handleAddAttackWithSaveToActor.bind(this);
-    CONFIG.queries[`${modulePrefix}.setActorSpellcasting`] = this.handleSetActorSpellcasting.bind(this);
+    CONFIG.queries[`${modulePrefix}.addPassiveFeatureToActor`] =
+      this.handleAddPassiveFeatureToActor.bind(this);
+    CONFIG.queries[`${modulePrefix}.addAttackWithSaveToActor`] =
+      this.handleAddAttackWithSaveToActor.bind(this);
+    CONFIG.queries[`${modulePrefix}.setActorSpellcasting`] =
+      this.handleSetActorSpellcasting.bind(this);
     CONFIG.queries[`${modulePrefix}.addSpellsToActor`] = this.handleAddSpellsToActor.bind(this);
-    CONFIG.queries[`${modulePrefix}.addFeaturesFromCompendium`] = this.handleAddFeaturesFromCompendium.bind(this);
+    CONFIG.queries[`${modulePrefix}.addFeaturesFromCompendium`] =
+      this.handleAddFeaturesFromCompendium.bind(this);
+
+    // 3A: Chat log / combat play-by-play / in-character chat
+    CONFIG.queries[`${modulePrefix}.getChatLog`] = this.handleGetChatLog.bind(this);
+    CONFIG.queries[`${modulePrefix}.getCombatPlayByPlay`] =
+      this.handleGetCombatPlayByPlay.bind(this);
+    CONFIG.queries[`${modulePrefix}.sendChatMessage`] = this.handleSendChatMessage.bind(this);
+
+    // 3C: Resource tracking
+    CONFIG.queries[`${modulePrefix}.getCharacterResources`] =
+      this.handleGetCharacterResources.bind(this);
+    CONFIG.queries[`${modulePrefix}.updateCharacterResource`] =
+      this.handleUpdateCharacterResource.bind(this);
+
+    // 3D: Active effects / conditions
+    CONFIG.queries[`${modulePrefix}.getActiveEffects`] = this.handleGetActiveEffects.bind(this);
+    CONFIG.queries[`${modulePrefix}.clearStaleConditions`] =
+      this.handleClearStaleConditions.bind(this);
+
+    // 3E: Combat tracker
+    CONFIG.queries[`${modulePrefix}.getCombatState`] = this.handleGetCombatState.bind(this);
+    CONFIG.queries[`${modulePrefix}.advanceCombatTurn`] = this.handleAdvanceCombatTurn.bind(this);
+    CONFIG.queries[`${modulePrefix}.setInitiative`] = this.handleSetInitiative.bind(this);
+
+    // 3F: Movement and positioning
+    CONFIG.queries[`${modulePrefix}.getTokenPositions`] = this.handleGetTokenPositions.bind(this);
+    CONFIG.queries[`${modulePrefix}.measureDistance`] = this.handleMeasureDistance.bind(this);
+
+    // 3G: Extended roll requests / NPC rolls
+    CONFIG.queries[`${modulePrefix}.requestAbilityCheck`] =
+      this.handleRequestAbilityCheck.bind(this);
+    CONFIG.queries[`${modulePrefix}.requestAttackRoll`] = this.handleRequestAttackRoll.bind(this);
+    CONFIG.queries[`${modulePrefix}.rollNpcCheck`] = this.handleRollNpcCheck.bind(this);
+
+    // 3H: Session event log
+    CONFIG.queries[`${modulePrefix}.getSessionLog`] = this.handleGetSessionLog.bind(this);
   }
 
   /**
@@ -1543,7 +1583,9 @@ export class QueryHandlers {
 
       return await this.dataAccess.updateWorldItems({ updates: data.updates });
     } catch (error) {
-      throw new Error(`Failed to update world items: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to update world items: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -1566,7 +1608,9 @@ export class QueryHandlers {
         ...(data.nameFilter !== undefined ? { nameFilter: data.nameFilter } : {}),
       });
     } catch (error) {
-      throw new Error(`Failed to list world items: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to list world items: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -1627,7 +1671,9 @@ export class QueryHandlers {
 
       return await this.dataAccess.addSaveFeatureToActor(data);
     } catch (error) {
-      throw new Error(`Failed to add save feature to actor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to add save feature to actor: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -1671,7 +1717,9 @@ export class QueryHandlers {
 
       return await this.dataAccess.createNpcActor(data);
     } catch (error) {
-      throw new Error(`Failed to create NPC actor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to create NPC actor: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -1703,7 +1751,9 @@ export class QueryHandlers {
 
       return await this.dataAccess.addAttackToActor(data);
     } catch (error) {
-      throw new Error(`Failed to add attack to actor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to add attack to actor: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -1738,7 +1788,9 @@ export class QueryHandlers {
 
       return await this.dataAccess.addAuraToActor(data);
     } catch (error) {
-      throw new Error(`Failed to add aura to actor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to add aura to actor: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -1763,7 +1815,9 @@ export class QueryHandlers {
 
       return await this.dataAccess.addPassiveFeatureToActor(data);
     } catch (error) {
-      throw new Error(`Failed to add passive feature to actor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to add passive feature to actor: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -1780,20 +1834,22 @@ export class QueryHandlers {
       this.dataAccess.validateFoundryState();
 
       if (!data.actorIdentifier) throw new Error('actorIdentifier is required');
-      if (!data.featureName)     throw new Error('featureName is required');
-      if (!data.attackType)      throw new Error('attackType is required');
+      if (!data.featureName) throw new Error('featureName is required');
+      if (!data.attackType) throw new Error('attackType is required');
       if (!Array.isArray(data.damageParts) || data.damageParts.length === 0) {
         throw new Error('damageParts is required and must contain at least one element');
       }
       if (!data.saveAbility) throw new Error('saveAbility is required');
-      if (!data.saveDC)      throw new Error('saveDC is required');
+      if (!data.saveDC) throw new Error('saveDC is required');
       if (!Array.isArray(data.saveDamageParts) || data.saveDamageParts.length === 0) {
         throw new Error('saveDamageParts is required and must contain at least one element');
       }
 
       return await this.dataAccess.addAttackWithSaveToActor(data);
     } catch (error) {
-      throw new Error(`Failed to add attack+save to actor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to add attack+save to actor: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -1805,7 +1861,11 @@ export class QueryHandlers {
       if (!data.spellcastingClass) {
         throw new Error('spellcastingClass is required');
       }
-      if (typeof data.spellcastingLevel !== 'number' || data.spellcastingLevel < 1 || data.spellcastingLevel > 20) {
+      if (
+        typeof data.spellcastingLevel !== 'number' ||
+        data.spellcastingLevel < 1 ||
+        data.spellcastingLevel > 20
+      ) {
         throw new Error('spellcastingLevel must be a number between 1 and 20');
       }
       if (!data.effectiveAbility) {
@@ -1814,7 +1874,9 @@ export class QueryHandlers {
 
       return await this.dataAccess.setActorSpellcasting(data);
     } catch (error) {
-      throw new Error(`Failed to set actor spellcasting: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to set actor spellcasting: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -1832,7 +1894,9 @@ export class QueryHandlers {
 
       return await this.dataAccess.addSpellsToActor(data);
     } catch (error) {
-      throw new Error(`Failed to add spells to actor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to add spells to actor: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -1850,8 +1914,330 @@ export class QueryHandlers {
 
       return await this.dataAccess.addFeaturesFromCompendium(data);
     } catch (error) {
-      throw new Error(`Failed to add features from compendium: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to add features from compendium: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
+  // ===== 3A: CHAT LOG / PLAY-BY-PLAY / IN-CHARACTER CHAT =====
+
+  async handleGetChatLog(data: {
+    limit?: number;
+    speakerName?: string;
+    messageType?: string;
+    sinceTimestamp?: string;
+  }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.getChatLog(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to get chat log: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleGetCombatPlayByPlay(): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.getCombatPlayByPlay();
+    } catch (error) {
+      throw new Error(
+        `Failed to get combat play-by-play: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleSendChatMessage(data: {
+    message: string;
+    speakerActorId?: string;
+    speakerActorName?: string;
+    messageType?: string;
+    whisperTargets?: string[];
+  }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.message) {
+        throw new Error('message is required');
+      }
+      return await this.dataAccess.sendChatMessage(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to send chat message: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  // ===== 3C: RESOURCE TRACKING =====
+
+  async handleGetCharacterResources(data: { identifier: string }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.identifier) {
+        throw new Error('identifier is required');
+      }
+      return await this.dataAccess.getCharacterResources(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to get character resources: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleUpdateCharacterResource(data: {
+    identifier: string;
+    resourceName: string;
+    newValue: number;
+  }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.identifier) throw new Error('identifier is required');
+      if (!data?.resourceName) throw new Error('resourceName is required');
+      if (data?.newValue === undefined || data?.newValue === null) {
+        throw new Error('newValue is required');
+      }
+      return await this.dataAccess.updateCharacterResource(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to update character resource: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  // ===== 3D: ACTIVE EFFECTS / CONDITIONS =====
+
+  async handleGetActiveEffects(data: { identifier: string }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.identifier) {
+        throw new Error('identifier is required');
+      }
+      return await this.dataAccess.getActiveEffects(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to get active effects: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleClearStaleConditions(data: {
+    identifier: string;
+    conditionNames?: string[];
+  }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.identifier) {
+        throw new Error('identifier is required');
+      }
+      return await this.dataAccess.clearStaleConditions(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to clear stale conditions: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  // ===== 3E: COMBAT TRACKER =====
+
+  async handleGetCombatState(): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.getCombatState();
+    } catch (error) {
+      throw new Error(
+        `Failed to get combat state: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleAdvanceCombatTurn(data: { skipTo?: string }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.advanceCombatTurn(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to advance combat turn: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleSetInitiative(data: { combatantName: string; initiative: number }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.combatantName) throw new Error('combatantName is required');
+      if (data?.initiative === undefined || data?.initiative === null) {
+        throw new Error('initiative is required');
+      }
+      return await this.dataAccess.setInitiative(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to set initiative: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  // ===== 3F: MOVEMENT AND POSITIONING =====
+
+  async handleGetTokenPositions(data: { sceneId?: string }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.getTokenPositions(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to get token positions: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleMeasureDistance(data: { fromTokenName: string; toTokenName: string }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.fromTokenName) throw new Error('fromTokenName is required');
+      if (!data?.toTokenName) throw new Error('toTokenName is required');
+      return await this.dataAccess.measureDistance(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to measure distance: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  // ===== 3G: EXTENDED ROLL REQUESTS / NPC ROLLS =====
+
+  async handleRequestAbilityCheck(data: {
+    targetPlayer: string;
+    ability: string;
+    dc?: number;
+    isPublic: boolean;
+    reason?: string;
+  }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.targetPlayer) throw new Error('targetPlayer is required');
+      if (!data?.ability) throw new Error('ability is required');
+      return await this.dataAccess.requestAbilityCheck(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to request ability check: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleRequestAttackRoll(data: {
+    targetPlayer: string;
+    weaponOrSpellName: string;
+    isPublic: boolean;
+  }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.targetPlayer) throw new Error('targetPlayer is required');
+      if (!data?.weaponOrSpellName) throw new Error('weaponOrSpellName is required');
+      return await this.dataAccess.requestAttackRoll(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to request attack roll: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleRollNpcCheck(data: {
+    actorName: string;
+    rollType: string;
+    rollTarget: string;
+    isPublic: boolean;
+  }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.actorName) throw new Error('actorName is required');
+      if (!data?.rollType) throw new Error('rollType is required');
+      if (!data?.rollTarget) throw new Error('rollTarget is required');
+      return await this.dataAccess.rollNpcCheck(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to roll NPC check: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  // ===== 3H: SESSION EVENT LOG =====
+
+  async handleGetSessionLog(data: {
+    limit?: number;
+    eventType?: string;
+    actorName?: string;
+  }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.getSessionLog(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to get session log: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
 }
