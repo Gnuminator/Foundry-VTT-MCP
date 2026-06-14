@@ -189,6 +189,17 @@ export class QueryHandlers {
     CONFIG.queries[`${modulePrefix}.rollSavingThrows`] = this.handleRollSavingThrows.bind(this);
     CONFIG.queries[`${modulePrefix}.useNpcActivity`] = this.handleUseNpcActivity.bind(this);
     CONFIG.queries[`${modulePrefix}.manageRest`] = this.handleManageRest.bind(this);
+
+    // Encounter & scene tools
+    CONFIG.queries[`${modulePrefix}.suggestBalancedEncounter`] =
+      this.handleSuggestBalancedEncounter.bind(this);
+    CONFIG.queries[`${modulePrefix}.placeMeasuredTemplate`] =
+      this.handlePlaceMeasuredTemplate.bind(this);
+    CONFIG.queries[`${modulePrefix}.setSceneMood`] = this.handleSetSceneMood.bind(this);
+    CONFIG.queries[`${modulePrefix}.addMapNote`] = this.handleAddMapNote.bind(this);
+    CONFIG.queries[`${modulePrefix}.setTokenVisionLight`] =
+      this.handleSetTokenVisionLight.bind(this);
+    CONFIG.queries[`${modulePrefix}.dropLoot`] = this.handleDropLoot.bind(this);
   }
 
   /**
@@ -2359,6 +2370,103 @@ export class QueryHandlers {
     } catch (error) {
       throw new Error(
         `Failed to manage rest: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  // ===== ENCOUNTER & SCENE TOOLS =====
+
+  async handleSuggestBalancedEncounter(data: any): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.suggestBalancedEncounter(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to suggest encounter: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handlePlaceMeasuredTemplate(data: any): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.shape) throw new Error('shape is required');
+      if (data?.distance === undefined || data?.distance === null) {
+        throw new Error('distance is required');
+      }
+      return await this.dataAccess.placeMeasuredTemplate(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to place template: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleSetSceneMood(data: any): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.setSceneMood(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to set scene mood: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleAddMapNote(data: any): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.addMapNote(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to add map note: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleSetTokenVisionLight(data: any): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.tokenName) throw new Error('tokenName is required');
+      return await this.dataAccess.setTokenVisionLight(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to set token vision/light: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleDropLoot(data: any): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.dropLoot(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to drop loot: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

@@ -24,7 +24,8 @@ const [{ config }, { Logger }, { FoundryClient }, { CharacterTools }, { Compendi
   { ActorCreationTools }, { QuestCreationTools }, { DiceRollTools }, { CampaignManagementTools },
   { OwnershipTools }, { TokenManipulationTools }, { MapGenerationTools },
   { ChatLogTools }, { ResourceTools }, { EffectsTools }, { CombatTools }, { MovementTools },
-  { SessionLogTools }, { CombatResolutionTools }, { getSystemRegistry },
+  { SessionLogTools }, { CombatResolutionTools }, { EncounterTools }, { SceneControlTools },
+  { LootTools }, { getSystemRegistry },
   { DnD5eAdapter }, { PF2eAdapter }, { DSA5Adapter }, { CosmereRpgAdapter }] = await Promise.all([
   importDist('config.js'),
   importDist('logger.js'),
@@ -46,6 +47,9 @@ const [{ config }, { Logger }, { FoundryClient }, { CharacterTools }, { Compendi
   importDist('tools/movement.js'),
   importDist('tools/session-log.js'),
   importDist('tools/combat-resolution.js'),
+  importDist('tools/encounter.js'),
+  importDist('tools/scene-control.js'),
+  importDist('tools/loot.js'),
   importDist('systems/index.js'),
   importDist('systems/dnd5e/adapter.js'),
   importDist('systems/pf2e/adapter.js'),
@@ -80,6 +84,9 @@ const tools = [
   ...new MovementTools({ foundryClient, logger }).getToolDefinitions(),
   ...new SessionLogTools({ foundryClient, logger }).getToolDefinitions(),
   ...new CombatResolutionTools({ foundryClient, logger }).getToolDefinitions(),
+  ...new EncounterTools({ foundryClient, logger }).getToolDefinitions(),
+  ...new SceneControlTools({ foundryClient, logger }).getToolDefinitions(),
+  ...new LootTools({ foundryClient, logger }).getToolDefinitions(),
 ];
 
 if (!tools.length) {

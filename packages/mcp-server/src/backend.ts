@@ -49,6 +49,9 @@ import { CombatTools } from './tools/combat.js';
 import { MovementTools } from './tools/movement.js';
 import { SessionLogTools } from './tools/session-log.js';
 import { CombatResolutionTools } from './tools/combat-resolution.js';
+import { EncounterTools } from './tools/encounter.js';
+import { SceneControlTools } from './tools/scene-control.js';
+import { LootTools } from './tools/loot.js';
 
 const CONTROL_HOST = '127.0.0.1';
 
@@ -1229,6 +1232,12 @@ async function startBackend(): Promise<void> {
 
   const combatResolutionTools = new CombatResolutionTools({ foundryClient, logger });
 
+  const encounterTools = new EncounterTools({ foundryClient, logger });
+
+  const sceneControlTools = new SceneControlTools({ foundryClient, logger });
+
+  const lootTools = new LootTools({ foundryClient, logger });
+
   // Initialize mapgen-style backend components for map generation
   let mapGenerationJobQueue: any = null;
   let mapGenerationComfyUIClient: any = null;
@@ -1465,6 +1474,12 @@ async function startBackend(): Promise<void> {
     ...sessionLogTools.getToolDefinitions(),
 
     ...combatResolutionTools.getToolDefinitions(),
+
+    ...encounterTools.getToolDefinitions(),
+
+    ...sceneControlTools.getToolDefinitions(),
+
+    ...lootTools.getToolDefinitions(),
   ];
 
   // Start Foundry connector (owns app port 31415)
@@ -1878,6 +1893,38 @@ async function startBackend(): Promise<void> {
 
                 case 'manage-rest':
                   result = await combatResolutionTools.handleManageRest(args);
+
+                  break;
+
+                // Encounter & scene tools
+
+                case 'suggest-balanced-encounter':
+                  result = await encounterTools.handleSuggestBalancedEncounter(args);
+
+                  break;
+
+                case 'place-measured-template':
+                  result = await encounterTools.handlePlaceMeasuredTemplate(args);
+
+                  break;
+
+                case 'set-scene-mood':
+                  result = await sceneControlTools.handleSetSceneMood(args);
+
+                  break;
+
+                case 'add-map-note':
+                  result = await sceneControlTools.handleAddMapNote(args);
+
+                  break;
+
+                case 'set-token-vision-light':
+                  result = await sceneControlTools.handleSetTokenVisionLight(args);
+
+                  break;
+
+                case 'drop-loot':
+                  result = await lootTools.handleDropLoot(args);
 
                   break;
 

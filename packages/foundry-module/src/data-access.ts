@@ -9963,6 +9963,457 @@ export class FoundryDataAccess {
     this.auditLog('manageRest', data, 'success');
     return { success: true, restType, results };
   }
+
+  // ===========================================================================
+  // Encounter & scene tools
+  // ===========================================================================
+
+  /**
+   * Compute an XP budget for the party and suggest creature CRs to fill it.
+   * Uses dnd5e's 2024 CONFIG.DND5E.ENCOUNTER_DIFFICULTY when present, otherwise
+   * a built-in 2014 DMG threshold table. Returns the budget; use the existing
+   * search/list-creatures tools to pick actual creatures near the suggested CRs.
+   */
+  async suggestBalancedEncounter(data: {
+    partyLevels?: number[];
+    difficulty?: 'low' | 'moderate' | 'high';
+  }): Promise<any> {
+    this.validateFoundryState();
+    this.requireDnd5e('suggest-balanced-encounter');
+
+    const cfg: any = (CONFIG as any).DND5E || {};
+    let levels = data.partyLevels;
+    if (!levels || levels.length === 0) {
+      levels = Array.from(game.actors || [])
+        .filter((a: any) => a.hasPlayerOwner && a.type === 'character')
+        .map((a: any) => a.system?.details?.level ?? 1);
+    }
+    if (!levels || levels.length === 0) {
+      throw new Error('No party levels available — pass partyLevels.');
+    }
+
+    const difficulty = data.difficulty || 'moderate';
+    let xpBudget = 0;
+    let model = 'unknown';
+
+    const table2024 = cfg.ENCOUNTER_DIFFICULTY;
+    if (Array.isArray(table2024)) {
+      model = '2024';
+      const col = { low: 0, moderate: 1, high: 2 }[difficulty];
+      for (const lvl of levels) {
+        const row = table2024[lvl];
+        if (Array.isArray(row)) xpBudget += row[col] ?? 0;
+      }
+    } else {
+      // 2014 DMG thresholds [easy, medium, hard, deadly] per character level.
+      model = '2014';
+      const T: Record<number, number[]> = {
+        1: [25, 50, 75, 100],
+        2: [50, 100, 150, 200],
+        3: [75, 150, 225, 400],
+        4: [125, 250, 375, 500],
+        5: [250, 500, 750, 1100],
+        6: [300, 600, 900, 1400],
+        7: [350, 750, 1100, 1700],
+        8: [450, 900, 1300, 2100],
+        9: [550, 1100, 1600, 2400],
+        10: [600, 1200, 1900, 2800],
+        11: [800, 1600, 2400, 3600],
+        12: [1000, 2000, 3000, 4500],
+        13: [1100, 2200, 3400, 5100],
+        14: [1250, 2500, 3800, 5700],
+        15: [1400, 2800, 4300, 6400],
+        16: [1600, 3200, 4800, 7200],
+        17: [2000, 3900, 5900, 8800],
+        18: [2100, 4200, 6300, 9500],
+        19: [2400, 4900, 7300, 10900],
+        20: [2800, 5700, 8500, 12700],
+      };
+      const col = { low: 0, moderate: 1, high: 3 }[difficulty]; // map high→deadly
+      for (const lvl of levels) {
+        const row = T[Math.max(1, Math.min(20, lvl))];
+        if (row) xpBudget += row[col] ?? 0;
+      }
+    }
+
+    const crExp: number[] = cfg.CR_EXP_LEVELS || [];
+    let singleCreatureMaxCR = 0;
+    for (let cr = 0; cr < crExp.length; cr++) {
+      if ((crExp[cr] ?? Infinity) <= xpBudget) singleCreatureMaxCR = cr;
+    }
+    const mixes = [1, 2, 4, 6].map(n => {
+      const per = xpBudget / n;
+      let cr = 0;
+      for (let c = 0; c < crExp.length; c++) if ((crExp[c] ?? Infinity) <= per) cr = c;
+      return { count: n, crEach: cr, xpEach: crExp[cr] ?? 0, totalXp: (crExp[cr] ?? 0) * n };
+    });
+
+    return {
+      success: true,
+      model,
+      difficulty,
+      partyLevels: levels,
+      xpBudget,
+      suggestions: { singleCreatureMaxCR, mixes },
+      note: 'Use list-creatures-by-criteria / search-compendium to pick creatures near these CRs.',
+    };
+  }
+
+  /** Geometric token-in-template test (no canvas dependency). */
+  private tokensInTemplate(scene: any, tpl: any): any[] {
+    const grid = scene.grid || {};
+    const size = grid.size || 100;
+    const px = size / (grid.distance || 5); // pixels per distance unit
+    const cx = tpl.x;
+    const cy = tpl.y;
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    return scene.tokens.filter((td: any) => {
+      const tx = td.x + ((td.width ?? 1) * size) / 2;
+      const ty = td.y + ((td.height ?? 1) * size) / 2;
+      const dx = tx - cx;
+      const dy = ty - cy;
+      const distUnits = Math.hypot(dx, dy) / px;
+      if (tpl.t === 'circle') return distUnits <= tpl.distance;
+      if (tpl.t === 'ray') {
+        const a = toRad(tpl.direction || 0);
+        const lx = (dx * Math.cos(a) + dy * Math.sin(a)) / px;
+        const ly = (-dx * Math.sin(a) + dy * Math.cos(a)) / px;
+        return lx >= 0 && lx <= tpl.distance && Math.abs(ly) <= (tpl.width || 5) / 2;
+      }
+      if (tpl.t === 'cone') {
+        if (distUnits > tpl.distance) return false;
+        let ang = (Math.atan2(dy, dx) * 180) / Math.PI - (tpl.direction || 0);
+        ang = ((ang + 540) % 360) - 180;
+        return Math.abs(ang) <= (tpl.angle || 53.13) / 2;
+      }
+      if (tpl.t === 'rect') {
+        const a = toRad(tpl.direction || 0);
+        const ex = cx + Math.cos(a) * tpl.distance * px;
+        const ey = cy + Math.sin(a) * tpl.distance * px;
+        return (
+          tx >= Math.min(cx, ex) &&
+          tx <= Math.max(cx, ex) &&
+          ty >= Math.min(cy, ey) &&
+          ty <= Math.max(cy, ey)
+        );
+      }
+      return false;
+    });
+  }
+
+  /**
+   * Place an AoE measured template on the active scene and report which tokens
+   * it covers. Origin is x/y pixels or the center of a named token.
+   */
+  async placeMeasuredTemplate(data: {
+    shape: 'circle' | 'cone' | 'ray' | 'rect';
+    distance: number;
+    x?: number;
+    y?: number;
+    originTokenName?: string;
+    direction?: number;
+    angle?: number;
+    width?: number;
+    fillColor?: string;
+  }): Promise<any> {
+    this.validateFoundryState();
+
+    const scene: any = (game.scenes as any)?.current;
+    if (!scene) throw new Error(ERROR_MESSAGES.SCENE_NOT_FOUND);
+    const grid = scene.grid || {};
+    const size = grid.size || 100;
+
+    let x = data.x;
+    let y = data.y;
+    if ((x == null || y == null) && data.originTokenName) {
+      const t = scene.tokens.find(
+        (tok: any) =>
+          tok.name?.toLowerCase() === data.originTokenName!.toLowerCase() ||
+          tok.id === data.originTokenName
+      );
+      if (t) {
+        x = t.x + ((t.width ?? 1) * size) / 2;
+        y = t.y + ((t.height ?? 1) * size) / 2;
+      }
+    }
+    if (x == null || y == null) throw new Error('Provide x/y or a valid originTokenName.');
+
+    const tdata: any = {
+      t: data.shape,
+      x,
+      y,
+      distance: data.distance,
+      direction: data.direction ?? 0,
+      fillColor: data.fillColor || (game.user as any)?.color || '#ff0000',
+    };
+    if (data.shape === 'cone') {
+      tdata.angle = data.angle ?? (CONFIG as any).MeasuredTemplate?.defaults?.angle ?? 53.13;
+    }
+    if (data.shape === 'ray') tdata.width = data.width ?? 5;
+    if (data.shape === 'rect' && data.direction == null) tdata.direction = 45;
+
+    const created = await scene.createEmbeddedDocuments('MeasuredTemplate', [tdata]);
+    const tpl = Array.isArray(created) ? created[0] : created;
+    const inside = this.tokensInTemplate(scene, tpl);
+
+    this.auditLog('placeMeasuredTemplate', data, 'success');
+    return {
+      success: true,
+      templateId: tpl.id,
+      shape: data.shape,
+      origin: { x, y },
+      distance: data.distance,
+      tokensInside: inside.map((t: any) => ({
+        name: t.name,
+        actorId: t.actorId || t.actor?.id || null,
+      })),
+    };
+  }
+
+  /**
+   * Set scene mood: darkness / global light (Foundry v13 environment schema with
+   * a pre-v13 fallback) and optional playlist play/stop.
+   */
+  async setSceneMood(data: {
+    darkness?: number;
+    globalLight?: boolean;
+    playlistName?: string;
+    playlistAction?: 'play' | 'stop';
+  }): Promise<any> {
+    this.validateFoundryState();
+
+    const scene: any = (game.scenes as any)?.current;
+    if (!scene) throw new Error(ERROR_MESSAGES.SCENE_NOT_FOUND);
+
+    const v13plus = parseInt(String(game.version || '0').split('.')[0], 10) >= 13;
+    const update: any = {};
+    if (data.darkness != null) {
+      const d = Math.max(0, Math.min(1, data.darkness));
+      if (v13plus) update['environment.darknessLevel'] = d;
+      else update.darkness = d;
+    }
+    if (data.globalLight != null) {
+      if (v13plus) update['environment.globalLight.enabled'] = data.globalLight;
+      else update.globalLight = data.globalLight;
+    }
+    if (Object.keys(update).length > 0) await scene.update(update);
+
+    let playlist: string | null = null;
+    if (data.playlistName) {
+      const pl =
+        (game.playlists as any)?.getName?.(data.playlistName) ||
+        (game.playlists as any)?.find?.(
+          (p: any) => p.name?.toLowerCase() === data.playlistName!.toLowerCase()
+        );
+      if (!pl) {
+        playlist = `Playlist not found: ${data.playlistName}`;
+      } else {
+        if ((data.playlistAction || 'play') === 'stop') await pl.stopAll();
+        else await pl.playAll();
+        playlist = `${data.playlistAction || 'play'} "${pl.name}"`;
+      }
+    }
+
+    this.auditLog('setSceneMood', data, 'success');
+    return {
+      success: true,
+      sceneId: scene.id,
+      darkness: data.darkness ?? null,
+      globalLight: data.globalLight ?? null,
+      playlist,
+    };
+  }
+
+  /**
+   * Drop a labeled, journal-linked map pin (Note) on the active scene. Position
+   * is x/y pixels or the position of a named token.
+   */
+  async addMapNote(data: {
+    text?: string;
+    x?: number;
+    y?: number;
+    tokenName?: string;
+    journalName?: string;
+    entryId?: string;
+    icon?: string;
+    iconSize?: number;
+  }): Promise<any> {
+    this.validateFoundryState();
+
+    const scene: any = (game.scenes as any)?.current;
+    if (!scene) throw new Error(ERROR_MESSAGES.SCENE_NOT_FOUND);
+
+    let x = data.x;
+    let y = data.y;
+    if ((x == null || y == null) && data.tokenName) {
+      const t = scene.tokens.find(
+        (tok: any) =>
+          tok.name?.toLowerCase() === data.tokenName!.toLowerCase() || tok.id === data.tokenName
+      );
+      if (t) {
+        x = t.x;
+        y = t.y;
+      }
+    }
+    if (x == null || y == null) throw new Error('Provide x/y or a valid tokenName.');
+
+    let entryId = data.entryId;
+    if (!entryId && data.journalName) {
+      const j =
+        (game.journal as any)?.getName?.(data.journalName) ||
+        (game.journal as any)?.find?.(
+          (e: any) => e.name?.toLowerCase() === data.journalName!.toLowerCase()
+        );
+      entryId = j?.id;
+    }
+
+    const noteData: any = {
+      x,
+      y,
+      iconSize: data.iconSize ?? 40,
+      fontSize: 24,
+      textAnchor: (CONST as any).TEXT_ANCHOR_POINTS?.BOTTOM ?? 1,
+      texture: { src: data.icon || 'icons/svg/book.svg' },
+    };
+    if (entryId) noteData.entryId = entryId;
+    if (data.text) noteData.text = data.text;
+
+    const created = await scene.createEmbeddedDocuments('Note', [noteData]);
+    const note = Array.isArray(created) ? created[0] : created;
+
+    this.auditLog('addMapNote', data, 'success');
+    return {
+      success: true,
+      noteId: note.id,
+      x,
+      y,
+      entryId: entryId ?? null,
+      text: data.text ?? null,
+    };
+  }
+
+  /**
+   * Set a token's vision and/or light (e.g. give it a torch, or toggle sight for
+   * a blinded creature) on the active scene.
+   */
+  async setTokenVisionLight(data: {
+    tokenName: string;
+    sightEnabled?: boolean;
+    sightRange?: number;
+    visionMode?: string;
+    lightDim?: number;
+    lightBright?: number;
+    lightColor?: string;
+    lightAnimation?: string;
+  }): Promise<any> {
+    this.validateFoundryState();
+
+    const scene: any = (game.scenes as any)?.current;
+    if (!scene) throw new Error(ERROR_MESSAGES.SCENE_NOT_FOUND);
+    const token = scene.tokens.find(
+      (t: any) => t.id === data.tokenName || t.name?.toLowerCase() === data.tokenName.toLowerCase()
+    );
+    if (!token) throw new Error(`Token not found: ${data.tokenName}`);
+
+    const update: any = {};
+    if (data.sightEnabled != null) update['sight.enabled'] = data.sightEnabled;
+    if (data.sightRange != null) update['sight.range'] = data.sightRange;
+    if (data.visionMode) update['sight.visionMode'] = data.visionMode;
+    if (data.lightDim != null) update['light.dim'] = data.lightDim;
+    if (data.lightBright != null) update['light.bright'] = data.lightBright;
+    if (data.lightColor) update['light.color'] = data.lightColor;
+    if (data.lightAnimation) update['light.animation.type'] = data.lightAnimation;
+
+    if (Object.keys(update).length === 0) {
+      throw new Error('No vision/light fields provided.');
+    }
+    await token.update(update);
+
+    this.auditLog('setTokenVisionLight', { tokenId: token.id, updates: update }, 'success');
+    return {
+      success: true,
+      tokenId: token.id,
+      tokenName: token.name,
+      updated: Object.keys(update),
+    };
+  }
+
+  /**
+   * Award loot: add currency and/or compendium items (by UUID) to a character,
+   * and/or announce the loot in chat.
+   */
+  async dropLoot(data: {
+    targetCharacter?: string;
+    currency?: Record<string, number>;
+    itemUuids?: string[];
+    announce?: boolean;
+  }): Promise<any> {
+    this.validateFoundryState();
+
+    const actor = data.targetCharacter ? this.resolveTargetActor(data.targetCharacter) : null;
+    if (data.targetCharacter && !actor) {
+      throw new Error(`Target not found: ${data.targetCharacter}`);
+    }
+
+    const itemsAdded: string[] = [];
+    if (actor) {
+      if (data.currency) {
+        const upd: any = {};
+        for (const k of ['pp', 'gp', 'ep', 'sp', 'cp']) {
+          if (data.currency[k] != null) {
+            upd[`system.currency.${k}`] =
+              (actor.system?.currency?.[k] ?? 0) + Number(data.currency[k]);
+          }
+        }
+        if (Object.keys(upd).length > 0) await actor.update(upd);
+      }
+      if (Array.isArray(data.itemUuids) && data.itemUuids.length > 0) {
+        const fromUuidFn = (globalThis as any).fromUuid;
+        const itemData: any[] = [];
+        for (const uuid of data.itemUuids) {
+          try {
+            const doc = fromUuidFn ? await fromUuidFn(uuid) : null;
+            if (doc) {
+              const obj = doc.toObject();
+              delete obj._id;
+              itemData.push(obj);
+              itemsAdded.push(obj.name);
+            }
+          } catch {
+            // skip bad uuid
+          }
+        }
+        if (itemData.length > 0) await actor.createEmbeddedDocuments('Item', itemData);
+      }
+    }
+
+    const parts: string[] = [];
+    if (data.currency) {
+      const coins = Object.entries(data.currency)
+        .filter(([, v]) => v)
+        .map(([k, v]) => `${v} ${k}`)
+        .join(', ');
+      if (coins) parts.push(coins);
+    }
+    if (itemsAdded.length) parts.push(itemsAdded.join(', '));
+    const summary = parts.join(' + ');
+
+    if (data.announce !== false) {
+      await (ChatMessage as any).create({
+        content: `<b>Loot${actor ? ` for ${actor.name}` : ''}:</b> ${summary || '(nothing)'}`,
+        speaker: (ChatMessage as any).getSpeaker({ alias: 'Loot' }),
+      });
+    }
+
+    this.auditLog('dropLoot', data, 'success');
+    return {
+      success: true,
+      target: actor?.name ?? null,
+      currency: data.currency ?? null,
+      itemsAdded,
+      summary,
+    };
+  }
 }
 
 // =============================================================================
