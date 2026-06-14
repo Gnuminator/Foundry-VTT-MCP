@@ -9891,6 +9891,7 @@ export class FoundryDataAccess {
     let damageTotal: number | null = null;
     let formula: string | null = null;
     let usedActivity = false;
+    let attackSucceeded: boolean | null = null;
 
     if (major >= 4) {
       const activities = (item as any).system?.activities;
@@ -9904,6 +9905,8 @@ export class FoundryDataAccess {
         attackTotal = atk?.total ?? null;
         isCritical = atk?.isCritical ?? false;
         formula = atk?.formula ?? null;
+        // dnd5e auto-fills the attack's target from a targeted token's AC.
+        attackSucceeded = typeof atk?.isSuccess === 'boolean' ? atk.isSuccess : null;
         const dmgOut = await attackAct.rollDamage(
           { isCritical },
           { configure: false },
@@ -9926,6 +9929,7 @@ export class FoundryDataAccess {
         attackTotal = atk.total ?? null;
         isCritical = atk.isCritical ?? false;
         formula = atk.formula ?? null;
+        attackSucceeded = typeof atk?.isSuccess === 'boolean' ? atk.isSuccess : null;
         const dmg = await (item as any).rollDamage({
           critical: isCritical,
           options: { fastForward: true },
@@ -9936,7 +9940,21 @@ export class FoundryDataAccess {
       }
     }
 
-    const hit = data.targetAC != null && attackTotal != null ? attackTotal >= data.targetAC : null;
+    // Resolve the target AC: explicit param wins, else the GM's targeted token.
+    let targetAC = data.targetAC ?? null;
+    let targetName: string | null = null;
+    try {
+      const userTargets = Array.from((game.user as any)?.targets ?? []);
+      if (userTargets.length > 0) {
+        const tt: any = userTargets[0];
+        targetName = tt.name ?? null;
+        if (targetAC == null) targetAC = tt.actor?.system?.attributes?.ac?.value ?? null;
+      }
+    } catch {
+      // no targeting available
+    }
+
+    const hit = targetAC != null && attackTotal != null ? attackTotal >= targetAC : attackSucceeded; // falls back to dnd5e's own target evaluation
 
     this.auditLog('useNpcActivity', { actor: actor.name, item: item.name }, 'success');
     return {
@@ -9945,6 +9963,8 @@ export class FoundryDataAccess {
       item: item.name,
       hadAttack: usedActivity,
       attackTotal,
+      targetName,
+      targetAC,
       hit,
       isCritical,
       damageTotal,
@@ -10449,6 +10469,85 @@ export class FoundryDataAccess {
       currency: data.currency ?? null,
       itemsAdded,
       summary,
+    };
+  }
+
+  // ===========================================================================
+  // Cleanup & targeting helpers
+  // ===========================================================================
+
+  /**
+   * Delete a measured template from the active scene by id, or clear all
+   * templates when `all` is set. Pairs with place-measured-template.
+   */
+  async deleteMeasuredTemplate(data: { templateId?: string; all?: boolean }): Promise<any> {
+    this.validateFoundryState();
+
+    const scene: any = (game.scenes as any)?.current;
+    if (!scene) throw new Error(ERROR_MESSAGES.SCENE_NOT_FOUND);
+
+    let ids: string[] = [];
+    if (data.all) {
+      ids = (scene.templates?.contents ?? scene.templates ?? []).map((t: any) => t.id);
+    } else if (data.templateId) {
+      ids = [data.templateId];
+    } else {
+      throw new Error('Provide templateId or set all=true.');
+    }
+
+    if (ids.length > 0) await scene.deleteEmbeddedDocuments('MeasuredTemplate', ids);
+    this.auditLog('deleteMeasuredTemplate', data, 'success');
+    return { success: true, deletedCount: ids.length, templateIds: ids };
+  }
+
+  /**
+   * Delete a map pin (Note) from the active scene by id, or by matching label
+   * text. (Does not support deleting all notes, to protect pre-existing pins.)
+   */
+  async deleteMapNote(data: { noteId?: string; text?: string }): Promise<any> {
+    this.validateFoundryState();
+
+    const scene: any = (game.scenes as any)?.current;
+    if (!scene) throw new Error(ERROR_MESSAGES.SCENE_NOT_FOUND);
+
+    const notes = scene.notes?.contents ?? scene.notes ?? [];
+    let ids: string[] = [];
+    if (data.noteId) {
+      ids = [data.noteId];
+    } else if (data.text) {
+      const needle = data.text.toLowerCase();
+      ids = notes.filter((n: any) => (n.text || '').toLowerCase() === needle).map((n: any) => n.id);
+      if (ids.length === 0) throw new Error(`No map note found with text "${data.text}".`);
+    } else {
+      throw new Error('Provide noteId or text.');
+    }
+
+    await scene.deleteEmbeddedDocuments('Note', ids);
+    this.auditLog('deleteMapNote', data, 'success');
+    return { success: true, deletedCount: ids.length, noteIds: ids };
+  }
+
+  /**
+   * Return the tokens the GM currently has targeted (game.user.targets), with
+   * AC and HP — used to resolve attack targets without passing coordinates/AC.
+   */
+  async getTargets(): Promise<any> {
+    this.validateFoundryState();
+
+    const targets = Array.from((game.user as any)?.targets ?? []);
+    return {
+      success: true,
+      count: targets.length,
+      targets: targets.map((t: any) => {
+        const hp = t.actor?.system?.attributes?.hp;
+        return {
+          tokenId: t.id,
+          name: t.name,
+          actorId: t.actor?.id ?? null,
+          ac: t.actor?.system?.attributes?.ac?.value ?? null,
+          hp: hp ? { value: hp.value ?? null, max: hp.max ?? null } : null,
+        };
+      }),
     };
   }
 }

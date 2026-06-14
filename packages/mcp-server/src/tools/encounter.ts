@@ -67,6 +67,18 @@ export class EncounterTools {
           required: ['shape', 'distance'],
         },
       },
+      {
+        name: 'delete-measured-template',
+        description:
+          'Remove a measured template from the active scene by templateId (from place-measured-template), or clear all templates with all=true. Use to clean up an AoE after resolving it.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            templateId: { type: 'string', description: 'Template ID to delete.' },
+            all: { type: 'boolean', description: 'Delete all templates on the scene.' },
+          },
+        },
+      },
     ];
   }
 
@@ -118,6 +130,27 @@ export class EncounterTools {
       if (error instanceof z.ZodError) {
         return `Parameter error: ${error.errors.map(e => e.message).join(', ')}`;
       }
+      throw error;
+    }
+  }
+
+  async handleDeleteMeasuredTemplate(args: any) {
+    const schema = z.object({
+      templateId: z.string().optional(),
+      all: z.boolean().optional(),
+    });
+    try {
+      const params = schema.parse(args ?? {});
+      const response = await this.foundryClient.query(
+        'foundry-mcp-bridge.deleteMeasuredTemplate',
+        params
+      );
+      if (response?.success === false) {
+        throw new Error(response.error || 'Failed to delete template');
+      }
+      return response;
+    } catch (error) {
+      this.logger.error('Error deleting template', error);
       throw error;
     }
   }

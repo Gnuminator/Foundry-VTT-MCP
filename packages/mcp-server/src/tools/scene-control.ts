@@ -88,6 +88,21 @@ export class SceneControlTools {
           required: ['tokenName'],
         },
       },
+      {
+        name: 'delete-map-note',
+        description:
+          'Remove a map pin (Note) from the active scene by noteId (from add-map-note) or by exact label text. Does not delete all notes (to protect pre-existing pins).',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            noteId: { type: 'string', description: 'Note ID to delete.' },
+            text: {
+              type: 'string',
+              description: 'Delete the pin(s) whose label matches this text.',
+            },
+          },
+        },
+      },
     ];
   }
 
@@ -158,6 +173,19 @@ export class SceneControlTools {
       if (error instanceof z.ZodError) {
         return `Parameter error: ${error.errors.map(e => e.message).join(', ')}`;
       }
+      throw error;
+    }
+  }
+
+  async handleDeleteMapNote(args: any) {
+    const schema = z.object({
+      noteId: z.string().optional(),
+      text: z.string().optional(),
+    });
+    try {
+      return await this.run('deleteMapNote', schema.parse(args ?? {}), 'Failed to delete map note');
+    } catch (error) {
+      this.logger.error('Error deleting map note', error);
       throw error;
     }
   }

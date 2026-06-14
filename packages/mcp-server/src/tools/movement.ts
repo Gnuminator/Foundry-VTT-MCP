@@ -48,7 +48,26 @@ export class MovementTools {
           required: ['fromTokenName', 'toTokenName'],
         },
       },
+      {
+        name: 'get-targets',
+        description:
+          "Return the tokens the GM currently has targeted in Foundry, with each target's AC and HP. Useful before use-npc-activity so an attack can resolve hit/miss against the actual target's AC.",
+        inputSchema: { type: 'object', properties: {} },
+      },
     ];
+  }
+
+  async handleGetTargets(_args: any) {
+    try {
+      const response = await this.foundryClient.query('foundry-mcp-bridge.getTargets', {});
+      if (response?.success === false) {
+        throw new Error(response.error || 'Failed to get targets');
+      }
+      return response;
+    } catch (error) {
+      this.logger.error('Error getting targets', error);
+      throw error;
+    }
   }
 
   async handleGetTokenPositions(args: any) {

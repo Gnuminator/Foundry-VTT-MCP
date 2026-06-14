@@ -1840,6 +1840,11 @@ async function startBackend(): Promise<void> {
 
                   break;
 
+                case 'get-targets':
+                  result = await movementTools.handleGetTargets(args);
+
+                  break;
+
                 // Extended roll requests / NPC rolls (3G)
 
                 case 'request-ability-check':
@@ -1908,6 +1913,11 @@ async function startBackend(): Promise<void> {
 
                   break;
 
+                case 'delete-measured-template':
+                  result = await encounterTools.handleDeleteMeasuredTemplate(args);
+
+                  break;
+
                 case 'set-scene-mood':
                   result = await sceneControlTools.handleSetSceneMood(args);
 
@@ -1920,6 +1930,11 @@ async function startBackend(): Promise<void> {
 
                 case 'set-token-vision-light':
                   result = await sceneControlTools.handleSetTokenVisionLight(args);
+
+                  break;
+
+                case 'delete-map-note':
+                  result = await sceneControlTools.handleDeleteMapNote(args);
 
                   break;
 

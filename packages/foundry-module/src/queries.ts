@@ -200,6 +200,12 @@ export class QueryHandlers {
     CONFIG.queries[`${modulePrefix}.setTokenVisionLight`] =
       this.handleSetTokenVisionLight.bind(this);
     CONFIG.queries[`${modulePrefix}.dropLoot`] = this.handleDropLoot.bind(this);
+
+    // Cleanup & targeting
+    CONFIG.queries[`${modulePrefix}.deleteMeasuredTemplate`] =
+      this.handleDeleteMeasuredTemplate.bind(this);
+    CONFIG.queries[`${modulePrefix}.deleteMapNote`] = this.handleDeleteMapNote.bind(this);
+    CONFIG.queries[`${modulePrefix}.getTargets`] = this.handleGetTargets.bind(this);
   }
 
   /**
@@ -2467,6 +2473,53 @@ export class QueryHandlers {
     } catch (error) {
       throw new Error(
         `Failed to drop loot: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  // ===== CLEANUP & TARGETING =====
+
+  async handleDeleteMeasuredTemplate(data: { templateId?: string; all?: boolean }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.deleteMeasuredTemplate(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to delete template: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleDeleteMapNote(data: { noteId?: string; text?: string }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.deleteMapNote(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to delete map note: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleGetTargets(): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.getTargets();
+    } catch (error) {
+      throw new Error(
+        `Failed to get targets: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }
