@@ -45,7 +45,7 @@ beforeEach(() => {
 });
 
 // Import after the harness type is in place (module construction is side-effect free).
-import { EventTracker } from './event-tracking.js';
+import { EventTracker } from './session-events.js';
 
 // --- Synthetic message builders ---------------------------------------------
 

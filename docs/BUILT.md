@@ -48,7 +48,7 @@ New message types were **added** to this generic dispatch, not substituted.
 
 ## New infrastructure
 
-- **`packages/foundry-module/src/event-tracking.ts`** — an `EventTracker` singleton owning two
+- **`packages/foundry-module/src/session-events.ts`** — an `EventTracker` singleton owning two
   in-browser rolling buffers for the session plus a combat turn timeline:
   - a **chat-log buffer** (parses every `createChatMessage`: rolls, totals, individual dice,
     crit/fumble, advantage/disadvantage, damage totals & types, flavor, message type);
@@ -58,7 +58,7 @@ New message types were **added** to this generic dispatch, not substituted.
   - `buildPlayByPlay()` is a **pure** function (no Foundry globals) so it's unit-tested.
 - **`chatLogBufferSize`** world setting (default 200) controls the chat buffer size.
 - **Test bench** (`test-bench/`) — see [test-bench/README.md](../test-bench/README.md).
-- **Unit tests** — `event-tracking.test.ts` (12 tests, synthetic-Foundry harness).
+- **Unit tests** — `session-events.test.ts` (12 tests, synthetic-Foundry harness).
 
 ---
 

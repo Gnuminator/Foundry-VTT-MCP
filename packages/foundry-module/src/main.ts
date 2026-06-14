@@ -4,7 +4,7 @@ import { QueryHandlers } from './queries.js';
 import { ModuleSettings } from './settings.js';
 import { CampaignHooks } from './campaign-hooks.js';
 import { ComfyUIManager } from './comfyui-manager.js';
-import { eventTracker } from './event-tracking.js';
+import { eventTracker } from './session-events.js';
 // Connection control now handled through settings menu
 
 /**
@@ -51,7 +51,7 @@ class FoundryMCPBridge {
       // Register campaign hooks for interactive dashboards
       this.campaignHooks.register();
 
-      // Register event-tracking hooks (chat log buffer + session event log).
+      // Register session-event hooks (chat log buffer + session event log).
       // These power the chat-log, combat play-by-play, and session-log tools.
       eventTracker.registerHooks();
 

@@ -52,7 +52,7 @@ alias}` — there is no `user` key, so the speaker fell back to default logic an
   document **subtype** (a string), not the numeric chat style — so IC/OOC/emote classification was
   unreliable.
 - **Now:** classifies on `message.style` only.
-- **File:** `packages/foundry-module/src/event-tracking.ts` (`classifyMessage`).
+- **File:** `packages/foundry-module/src/session-events.ts` (`classifyMessage`).
 
 ### Session log dropped the first HP/resource change after world load
 
@@ -60,7 +60,7 @@ alias}` — there is no `user` key, so the speaker fell back to default logic an
   first damage/heal/death/spend of a session had no baseline to diff against and produced no event.
 - **Now:** caches are seeded from current actor state on the `ready` hook, so the first change of the
   session is detected.
-- **File:** `event-tracking.ts` (`seedCaches`, called from `registerHooks`).
+- **File:** `session-events.ts` (`seedCaches`, called from `registerHooks`).
 
 ---
 
@@ -83,29 +83,27 @@ alias}` — there is no `user` key, so the speaker fell back to default logic an
 
 ---
 
-## Diagnostics added (not yet a fix)
+## v0.10.1
 
-### Roll-request button "does nothing when clicked"
+### Roll-request button "does nothing when clicked" — root cause #1 (loading)
 
-A player reported that clicking a `request-player-rolls` button did nothing. The click-handler chain
-(`renderChatMessageHTML` hook → `attachRollButtonHandlers`) and the character→player resolution both
-look correct on inspection, so the root cause needs the **player's browser-console output from a live
-click** to pin down.
+The buttons (and the whole module settings panel) failed to load because an **ad blocker blocked
+`event-tracking.js`** — the filename contains "tracking". Allowlisting fixed it, but players can't be
+asked to allowlist, so the file was renamed `event-tracking.ts` → **`session-events.ts`** (imports
+updated in `data-access`, `main`, and the test; dist clean-rebuilt so no "tracking" filename ships).
 
-A diagnostic line was added to `attachRollButtonHandlers`:
+### Roll-request button — root cause #2 (formula)
 
-```
-[foundry-mcp-bridge] attachRollButtonHandlers: N button(s) for user "<name>" (GM=…)
-```
+Once loading, clicking a button fired the handler but threw
+`SyntaxError: ... but "[" found` from `new Roll(rollFormula)`. On **dnd5e v5**, `abilities.<x>.save`
+in roll data is an **object**, so `buildRollFormula`'s `1d20+${saveMod}` produced
+`1d20+[object Object]`. Fixes in `data-access.ts`:
 
-Triage (see `test-bench/README.md`):
-
-- **Line absent** when the player clicks → the render hook never attached handlers on their client
-  (Foundry-version hook mismatch, or the module not initialising for non-GM users) — leading suspect.
-- **Line present but nothing happens** → look for `Permission denied for roll execution` or a thrown
-  `roll.toMessage` error.
-
-This remains open pending that console output.
+- `buildRollFormula` now coerces every modifier to a finite number (digging `.value`/`.total`/`.mod`
+  out of objects) and formats the sign correctly (no `+-2`).
+- The click handler reads the formula via `.attr('data-roll-formula')` (avoiding jQuery `.data()`
+  coercion), logs it, and validates with `Roll.validate()` before constructing, throwing a clear
+  `Invalid roll formula: "…"` instead of a cryptic parse error.
 
 ---
 

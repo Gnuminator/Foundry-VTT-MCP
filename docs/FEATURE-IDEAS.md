@@ -34,7 +34,7 @@ Legend — Feasibility: HIGH/MED/LOW · Effort: S/M/L.
 | 7   | **place-measured-template**    | Drop a cone/sphere/line AoE and report who's inside                | `scene.createEmbeddedDocuments('MeasuredTemplate')`         | HIGH place / MED overlap                   | M      |
 | 8   | **set-scene-mood**             | Adjust darkness/global light; start/stop playlist or ambient sound | `Scene.update({environment…})`, `Playlist#playAll`          | HIGH (light/music) / MED (sound placement) | M      |
 | 9   | **drop-loot / award-treasure** | Generate currency + items; give to a PC, a loot token, or chat     | `Actor#update(currency)`, `createEmbeddedDocuments('Item')` | HIGH                                       | M      |
-| 10  | **get-recent-events**          | A low-latency "what happened since X" delta over the tracked hooks | already wired in `event-tracking.ts`                        | HIGH                                       | S      |
+| 10  | **get-recent-events**          | A low-latency "what happened since X" delta over the tracked hooks | already wired in `session-events.ts`                        | HIGH                                       | S      |
 
 ## Tier 3 — Feasible, niche
 

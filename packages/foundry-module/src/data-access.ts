@@ -1,7 +1,7 @@
 import { MODULE_ID, ERROR_MESSAGES, TOKEN_DISPOSITIONS } from './constants.js';
 import { permissionManager } from './permissions.js';
 import { transactionManager } from './transaction-manager.js';
-import { eventTracker } from './event-tracking.js';
+import { eventTracker } from './session-events.js';
 // Local type definitions to avoid shared package import issues
 interface CharacterInfo {
   id: string;
@@ -5385,37 +5385,55 @@ export class FoundryDataAccess {
   ): string {
     let baseFormula = '1d20';
 
+    // Coerce a roll-data field to a finite number. In dnd5e v5 some fields that
+    // were plain numbers are now objects (e.g. abilities.<x>.save), so a naive
+    // `1d20+${field}` produced "1d20+[object Object]" and broke Roll parsing.
+    const toMod = (v: any): number => {
+      if (v == null) return 0;
+      if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+      if (typeof v === 'object') {
+        const inner = v.value ?? v.total ?? v.mod ?? v.bonus;
+        const n = Number(inner);
+        return Number.isFinite(n) ? n : 0;
+      }
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+    // Format a modifier with an explicit sign so negatives don't produce "+-2".
+    const signed = (n: number): string => `${n >= 0 ? '+' : ''}${n}`;
+
     if (character) {
       // Use Foundry's getRollData() to get calculated modifiers including active effects
       const rollData = character.getRollData() as any; // Type assertion for Foundry's dynamic roll data
 
       switch (rollType) {
-        case 'ability':
-          // Use calculated ability modifier from roll data
-          const abilityMod = rollData.abilities?.[rollTarget]?.mod ?? 0;
-          baseFormula = `1d20+${abilityMod}`;
+        case 'ability': {
+          const abilityMod = toMod(rollData.abilities?.[rollTarget]?.mod);
+          baseFormula = `1d20${signed(abilityMod)}`;
           break;
+        }
 
-        case 'skill':
+        case 'skill': {
           // Map skill name to skill code (D&D 5e uses 3-letter codes)
           const skillCode = this.getSkillCode(rollTarget);
-          // Use calculated skill total from roll data (includes ability mod + proficiency + bonuses)
-          const skillMod = rollData.skills?.[skillCode]?.total ?? 0;
-          baseFormula = `1d20+${skillMod}`;
+          const skillMod = toMod(rollData.skills?.[skillCode]?.total);
+          baseFormula = `1d20${signed(skillMod)}`;
           break;
+        }
 
-        case 'save':
-          // Use saving throw modifier from roll data
-          const saveMod =
-            rollData.abilities?.[rollTarget]?.save ?? rollData.abilities?.[rollTarget]?.mod ?? 0;
-          baseFormula = `1d20+${saveMod}`;
+        case 'save': {
+          // dnd5e v5: abilities.<x>.save is an object; toMod digs out .value.
+          const ability = rollData.abilities?.[rollTarget];
+          const saveMod = toMod(ability?.save) || toMod(ability?.mod);
+          baseFormula = `1d20${signed(saveMod)}`;
           break;
+        }
 
-        case 'initiative':
-          // Use initiative modifier from attributes or dex mod
-          const initMod = rollData.attributes?.init?.mod ?? rollData.abilities?.dex?.mod ?? 0;
-          baseFormula = `1d20+${initMod}`;
+        case 'initiative': {
+          const initMod = toMod(rollData.attributes?.init?.mod ?? rollData.abilities?.dex?.mod);
+          baseFormula = `1d20${signed(initMod)}`;
           break;
+        }
 
         case 'custom':
           baseFormula = rollTarget; // Use rollTarget as the formula directly
@@ -5595,8 +5613,10 @@ export class FoundryDataAccess {
         return;
       }
 
-      const rollFormula = button.data('roll-formula');
-      const rollLabel = button.data('roll-label');
+      // Read via attr() to avoid jQuery .data() coercion (it JSON-parses values
+      // that look like numbers/arrays/objects, which can mangle a roll formula).
+      const rollFormula = button.attr('data-roll-formula') ?? button.data('roll-formula');
+      const rollLabel = button.attr('data-roll-label') ?? button.data('roll-label');
       const isPublicRaw = button.data('is-public');
       const isPublic = isPublicRaw === true || isPublicRaw === 'true'; // Convert to proper boolean
       const characterId = button.data('character-id');
@@ -5614,8 +5634,16 @@ export class FoundryDataAccess {
       }
 
       try {
-        // Create and evaluate the roll
-        const roll = new Roll(rollFormula);
+        // Diagnostic: surface the exact formula before parsing (helps catch
+        // malformed formulas like "1d20+[object Object]").
+        console.log(`[${MODULE_ID}] Executing roll with formula:`, rollFormula);
+
+        // Create and evaluate the roll, validating first for a clear error.
+        const RollCls: any = Roll;
+        if (typeof RollCls.validate === 'function' && !RollCls.validate(rollFormula)) {
+          throw new Error(`Invalid roll formula: "${rollFormula}"`);
+        }
+        const roll = new RollCls(rollFormula);
         await roll.evaluate();
 
         // Get the character for speaker info
