@@ -42,6 +42,13 @@ import { DnD5eAddFeatureTool } from './tools/dnd5e/add-feature.js';
 import { DnD5eNpcTools } from './tools/dnd5e/npc.js';
 import { DnD5eFeaturesFromCompendiumTools } from './tools/dnd5e/features.js';
 
+import { ChatLogTools } from './tools/chat-log.js';
+import { ResourceTools } from './tools/resources.js';
+import { EffectsTools } from './tools/effects.js';
+import { CombatTools } from './tools/combat.js';
+import { MovementTools } from './tools/movement.js';
+import { SessionLogTools } from './tools/session-log.js';
+
 const CONTROL_HOST = '127.0.0.1';
 
 const CONTROL_PORT = 31414;
@@ -190,15 +197,16 @@ function acquireLock(): boolean {
             if (evaluateLockFile(lockPid, LOCK_FILE) === 'orphaned') {
               console.error(
                 `Removing orphaned backend lock for PID ${lockPid} ` +
-                `(process is not node.exe or lock file is stale)`,
+                  `(process is not node.exe or lock file is stale)`
               );
-              try { fs.unlinkSync(LOCK_FILE); } catch {}
+              try {
+                fs.unlinkSync(LOCK_FILE);
+              } catch {}
               lockFd = fs.openSync(LOCK_FILE, 'wx');
             } else {
               // Backend is genuinely running — exit gracefully
               return false;
             }
-
           } catch {
             console.error(`Removing stale backend lock for PID ${lockPid}`);
 
@@ -1189,9 +1197,12 @@ async function startBackend(): Promise<void> {
 
   const dsa5CharacterCreator = new DSA5CharacterCreator({ foundryClient, logger });
 
-  const dnd5eAddFeatureTool              = new DnD5eAddFeatureTool({ foundryClient, logger });
-  const dnd5eNpcTools                    = new DnD5eNpcTools({ foundryClient, logger });
-  const dnd5eFeaturesFromCompendiumTools = new DnD5eFeaturesFromCompendiumTools({ foundryClient, logger });
+  const dnd5eAddFeatureTool = new DnD5eAddFeatureTool({ foundryClient, logger });
+  const dnd5eNpcTools = new DnD5eNpcTools({ foundryClient, logger });
+  const dnd5eFeaturesFromCompendiumTools = new DnD5eFeaturesFromCompendiumTools({
+    foundryClient,
+    logger,
+  });
 
   const questCreationTools = new QuestCreationTools({ foundryClient, logger });
 
@@ -1202,6 +1213,18 @@ async function startBackend(): Promise<void> {
   const ownershipTools = new OwnershipTools({ foundryClient, logger });
 
   const tokenManipulationTools = new TokenManipulationTools({ foundryClient, logger });
+
+  const chatLogTools = new ChatLogTools({ foundryClient, logger });
+
+  const resourceTools = new ResourceTools({ foundryClient, logger });
+
+  const effectsTools = new EffectsTools({ foundryClient, logger });
+
+  const combatTools = new CombatTools({ foundryClient, logger });
+
+  const movementTools = new MovementTools({ foundryClient, logger });
+
+  const sessionLogTools = new SessionLogTools({ foundryClient, logger });
 
   // Initialize mapgen-style backend components for map generation
   let mapGenerationJobQueue: any = null;
@@ -1425,6 +1448,18 @@ async function startBackend(): Promise<void> {
     ...tokenManipulationTools.getToolDefinitions(),
 
     ...mapGenerationTools.getToolDefinitions(),
+
+    ...chatLogTools.getToolDefinitions(),
+
+    ...resourceTools.getToolDefinitions(),
+
+    ...effectsTools.getToolDefinitions(),
+
+    ...combatTools.getToolDefinitions(),
+
+    ...movementTools.getToolDefinitions(),
+
+    ...sessionLogTools.getToolDefinitions(),
   ];
 
   // Start Foundry connector (owns app port 31415)
@@ -1583,20 +1618,18 @@ async function startBackend(): Promise<void> {
                 // D&D 5e tools
 
                 case 'dnd5e-add-feature':
-
                   result = await dnd5eAddFeatureTool.handleAddFeature(args);
 
                   break;
 
                 case 'dnd5e-create-npc':
-
                   result = await dnd5eNpcTools.handleCreateNpc(args);
 
                   break;
 
                 case 'dnd5e-add-features-from-compendium':
-
-                  result = await dnd5eFeaturesFromCompendiumTools.handleAddFeaturesFromCompendium(args);
+                  result =
+                    await dnd5eFeaturesFromCompendiumTools.handleAddFeaturesFromCompendium(args);
 
                   break;
 
@@ -1714,6 +1747,100 @@ async function startBackend(): Promise<void> {
 
                 case 'switch-scene':
                   result = await mapGenerationTools.switchScene(args);
+
+                  break;
+
+                // Chat log / play-by-play / in-character chat (3A)
+
+                case 'get-chat-log':
+                  result = await chatLogTools.handleGetChatLog(args);
+
+                  break;
+
+                case 'get-combat-play-by-play':
+                  result = await chatLogTools.handleGetCombatPlayByPlay(args);
+
+                  break;
+
+                case 'send-chat-message':
+                  result = await chatLogTools.handleSendChatMessage(args);
+
+                  break;
+
+                // Resource tracking (3C)
+
+                case 'get-character-resources':
+                  result = await resourceTools.handleGetCharacterResources(args);
+
+                  break;
+
+                case 'update-character-resource':
+                  result = await resourceTools.handleUpdateCharacterResource(args);
+
+                  break;
+
+                // Active effects / conditions (3D)
+
+                case 'get-active-effects':
+                  result = await effectsTools.handleGetActiveEffects(args);
+
+                  break;
+
+                case 'clear-stale-conditions':
+                  result = await effectsTools.handleClearStaleConditions(args);
+
+                  break;
+
+                // Combat tracker (3E)
+
+                case 'get-combat-state':
+                  result = await combatTools.handleGetCombatState(args);
+
+                  break;
+
+                case 'advance-combat-turn':
+                  result = await combatTools.handleAdvanceCombatTurn(args);
+
+                  break;
+
+                case 'set-initiative':
+                  result = await combatTools.handleSetInitiative(args);
+
+                  break;
+
+                // Movement and positioning (3F)
+
+                case 'get-token-positions':
+                  result = await movementTools.handleGetTokenPositions(args);
+
+                  break;
+
+                case 'measure-distance':
+                  result = await movementTools.handleMeasureDistance(args);
+
+                  break;
+
+                // Extended roll requests / NPC rolls (3G)
+
+                case 'request-ability-check':
+                  result = await diceRollTools.handleRequestAbilityCheck(args);
+
+                  break;
+
+                case 'request-attack-roll':
+                  result = await diceRollTools.handleRequestAttackRoll(args);
+
+                  break;
+
+                case 'roll-npc-check':
+                  result = await diceRollTools.handleRollNpcCheck(args);
+
+                  break;
+
+                // Session event log (3H)
+
+                case 'get-session-log':
+                  result = await sessionLogTools.handleGetSessionLog(args);
 
                   break;
 

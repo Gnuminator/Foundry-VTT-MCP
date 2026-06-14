@@ -22,7 +22,9 @@ const importDist = async (relativePath) =>
 
 const [{ config }, { Logger }, { FoundryClient }, { CharacterTools }, { CompendiumTools }, { SceneTools },
   { ActorCreationTools }, { QuestCreationTools }, { DiceRollTools }, { CampaignManagementTools },
-  { OwnershipTools }, { TokenManipulationTools }, { MapGenerationTools }, { getSystemRegistry },
+  { OwnershipTools }, { TokenManipulationTools }, { MapGenerationTools },
+  { ChatLogTools }, { ResourceTools }, { EffectsTools }, { CombatTools }, { MovementTools },
+  { SessionLogTools }, { getSystemRegistry },
   { DnD5eAdapter }, { PF2eAdapter }, { DSA5Adapter }, { CosmereRpgAdapter }] = await Promise.all([
   importDist('config.js'),
   importDist('logger.js'),
@@ -37,6 +39,12 @@ const [{ config }, { Logger }, { FoundryClient }, { CharacterTools }, { Compendi
   importDist('tools/ownership.js'),
   importDist('tools/token-manipulation.js'),
   importDist('tools/map-generation.js'),
+  importDist('tools/chat-log.js'),
+  importDist('tools/resources.js'),
+  importDist('tools/effects.js'),
+  importDist('tools/combat.js'),
+  importDist('tools/movement.js'),
+  importDist('tools/session-log.js'),
   importDist('systems/index.js'),
   importDist('systems/dnd5e/adapter.js'),
   importDist('systems/pf2e/adapter.js'),
@@ -64,6 +72,12 @@ const tools = [
   ...new OwnershipTools({ foundryClient, logger }).getToolDefinitions(),
   ...new TokenManipulationTools({ foundryClient, logger }).getToolDefinitions(),
   ...new MapGenerationTools({ foundryClient, logger, backendComfyUIHandlers: {} }).getToolDefinitions(),
+  ...new ChatLogTools({ foundryClient, logger }).getToolDefinitions(),
+  ...new ResourceTools({ foundryClient, logger }).getToolDefinitions(),
+  ...new EffectsTools({ foundryClient, logger }).getToolDefinitions(),
+  ...new CombatTools({ foundryClient, logger }).getToolDefinitions(),
+  ...new MovementTools({ foundryClient, logger }).getToolDefinitions(),
+  ...new SessionLogTools({ foundryClient, logger }).getToolDefinitions(),
 ];
 
 if (!tools.length) {

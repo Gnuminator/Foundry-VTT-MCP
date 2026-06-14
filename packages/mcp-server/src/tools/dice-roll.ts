@@ -71,7 +71,165 @@ export class DiceRollTools {
           ],
         },
       },
+      {
+        name: 'request-ability-check',
+        description:
+          'Request an ability check from a player, posting a clickable roll button to their chat. Shows the DC when provided. Use for checks like "Perception check to notice the ambush".',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            targetPlayer: {
+              type: 'string',
+              description: 'Player name or character name to request the roll from.',
+            },
+            ability: {
+              type: 'string',
+              description: 'Ability to check.',
+              enum: ['str', 'dex', 'con', 'int', 'wis', 'cha'],
+            },
+            dc: {
+              type: 'integer',
+              description: 'Optional difficulty class to display with the request.',
+            },
+            isPublic: {
+              type: 'boolean',
+              description:
+                'Whether the roll is public (visible to all) or private (target player + GM only).',
+            },
+            reason: {
+              type: 'string',
+              description: 'Context for the check, e.g. "Perception check to notice the ambush".',
+            },
+          },
+          required: ['targetPlayer', 'ability', 'isPublic'],
+        },
+      },
+      {
+        name: 'request-attack-roll',
+        description:
+          'Request an attack roll for a specific weapon or spell from a player, posting a clickable roll button to their chat.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            targetPlayer: {
+              type: 'string',
+              description: 'Player name or character name to request the roll from.',
+            },
+            weaponOrSpellName: {
+              type: 'string',
+              description: 'Name of the weapon or spell attack.',
+            },
+            isPublic: {
+              type: 'boolean',
+              description:
+                'Whether the roll is public (visible to all) or private (target player + GM only).',
+            },
+          },
+          required: ['targetPlayer', 'weaponOrSpellName', 'isPublic'],
+        },
+      },
+      {
+        name: 'roll-npc-check',
+        description:
+          'Roll directly for an NPC actor (no player prompt) and post the result to chat. Supports ability checks, saving throws, skill checks, and attacks.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            actorName: { type: 'string', description: 'NPC actor name or ID.' },
+            rollType: {
+              type: 'string',
+              description: 'Type of roll.',
+              enum: ['ability', 'save', 'skill', 'attack'],
+            },
+            rollTarget: {
+              type: 'string',
+              description:
+                'Target for the roll: ability (str/dex/...), skill name (perception, stealth, ...), or weapon/attack name.',
+            },
+            isPublic: {
+              type: 'boolean',
+              description: 'Whether the result is public (true) or whispered to the GM (false).',
+            },
+          },
+          required: ['actorName', 'rollType', 'rollTarget', 'isPublic'],
+        },
+      },
     ];
+  }
+
+  async handleRequestAbilityCheck(args: any) {
+    const schema = z.object({
+      targetPlayer: z.string(),
+      ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']),
+      dc: z.number().int().optional(),
+      isPublic: z.boolean(),
+      reason: z.string().optional(),
+    });
+    try {
+      const params = schema.parse(args);
+      const response = await this.foundryClient.query(
+        'foundry-mcp-bridge.requestAbilityCheck',
+        params
+      );
+      if (response?.success) {
+        return `Ability check requested. ${response.message}`;
+      }
+      throw new Error(response?.error || 'Failed to request ability check');
+    } catch (error) {
+      this.logger.error('Error requesting ability check', error);
+      if (error instanceof z.ZodError) {
+        return `Parameter error: ${error.errors.map(e => e.message).join(', ')}`;
+      }
+      throw error;
+    }
+  }
+
+  async handleRequestAttackRoll(args: any) {
+    const schema = z.object({
+      targetPlayer: z.string(),
+      weaponOrSpellName: z.string(),
+      isPublic: z.boolean(),
+    });
+    try {
+      const params = schema.parse(args);
+      const response = await this.foundryClient.query(
+        'foundry-mcp-bridge.requestAttackRoll',
+        params
+      );
+      if (response?.success) {
+        return `Attack roll requested. ${response.message}`;
+      }
+      throw new Error(response?.error || 'Failed to request attack roll');
+    } catch (error) {
+      this.logger.error('Error requesting attack roll', error);
+      if (error instanceof z.ZodError) {
+        return `Parameter error: ${error.errors.map(e => e.message).join(', ')}`;
+      }
+      throw error;
+    }
+  }
+
+  async handleRollNpcCheck(args: any) {
+    const schema = z.object({
+      actorName: z.string(),
+      rollType: z.enum(['ability', 'save', 'skill', 'attack']),
+      rollTarget: z.string(),
+      isPublic: z.boolean(),
+    });
+    try {
+      const params = schema.parse(args);
+      const response = await this.foundryClient.query('foundry-mcp-bridge.rollNpcCheck', params);
+      if (response?.success === false) {
+        throw new Error(response.error || 'Failed to roll NPC check');
+      }
+      return response;
+    } catch (error) {
+      this.logger.error('Error rolling NPC check', error);
+      if (error instanceof z.ZodError) {
+        return `Parameter error: ${error.errors.map(e => e.message).join(', ')}`;
+      }
+      throw error;
+    }
   }
 
   async handleRequestPlayerRolls(args: any) {
