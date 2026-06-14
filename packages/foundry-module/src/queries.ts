@@ -181,9 +181,14 @@ export class QueryHandlers {
     CONFIG.queries[`${modulePrefix}.getSessionLog`] = this.handleGetSessionLog.bind(this);
     CONFIG.queries[`${modulePrefix}.getRecentEvents`] = this.handleGetRecentEvents.bind(this);
 
-    // Combat resolution: initiative
+    // Combat resolution
     CONFIG.queries[`${modulePrefix}.rollInitiativeForNpcs`] =
       this.handleRollInitiativeForNpcs.bind(this);
+    CONFIG.queries[`${modulePrefix}.applyDamageAndHealing`] =
+      this.handleApplyDamageAndHealing.bind(this);
+    CONFIG.queries[`${modulePrefix}.rollSavingThrows`] = this.handleRollSavingThrows.bind(this);
+    CONFIG.queries[`${modulePrefix}.useNpcActivity`] = this.handleUseNpcActivity.bind(this);
+    CONFIG.queries[`${modulePrefix}.manageRest`] = this.handleManageRest.bind(this);
   }
 
   /**
@@ -2278,6 +2283,82 @@ export class QueryHandlers {
     } catch (error) {
       throw new Error(
         `Failed to roll initiative: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleApplyDamageAndHealing(data: any): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!Array.isArray(data?.targets) || data.targets.length === 0) {
+        throw new Error('targets array is required');
+      }
+      if (data?.amount === undefined || data?.amount === null) {
+        throw new Error('amount is required');
+      }
+      return await this.dataAccess.applyDamageAndHealing(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to apply damage/healing: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleRollSavingThrows(data: any): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!Array.isArray(data?.targets) || data.targets.length === 0) {
+        throw new Error('targets array is required');
+      }
+      if (!data?.rollType) throw new Error('rollType is required');
+      return await this.dataAccess.rollSavingThrows(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to roll saving throws: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleUseNpcActivity(data: any): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.actorName) throw new Error('actorName is required');
+      if (!data?.itemName) throw new Error('itemName is required');
+      return await this.dataAccess.useNpcActivity(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to use NPC activity: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleManageRest(data: any): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!Array.isArray(data?.targets) || data.targets.length === 0) {
+        throw new Error('targets array is required');
+      }
+      if (!data?.restType) throw new Error('restType is required');
+      return await this.dataAccess.manageRest(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to manage rest: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

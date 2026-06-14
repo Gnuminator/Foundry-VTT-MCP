@@ -48,6 +48,7 @@ import { EffectsTools } from './tools/effects.js';
 import { CombatTools } from './tools/combat.js';
 import { MovementTools } from './tools/movement.js';
 import { SessionLogTools } from './tools/session-log.js';
+import { CombatResolutionTools } from './tools/combat-resolution.js';
 
 const CONTROL_HOST = '127.0.0.1';
 
@@ -1226,6 +1227,8 @@ async function startBackend(): Promise<void> {
 
   const sessionLogTools = new SessionLogTools({ foundryClient, logger });
 
+  const combatResolutionTools = new CombatResolutionTools({ foundryClient, logger });
+
   // Initialize mapgen-style backend components for map generation
   let mapGenerationJobQueue: any = null;
   let mapGenerationComfyUIClient: any = null;
@@ -1460,6 +1463,8 @@ async function startBackend(): Promise<void> {
     ...movementTools.getToolDefinitions(),
 
     ...sessionLogTools.getToolDefinitions(),
+
+    ...combatResolutionTools.getToolDefinitions(),
   ];
 
   // Start Foundry connector (owns app port 31415)
@@ -1851,6 +1856,28 @@ async function startBackend(): Promise<void> {
 
                 case 'roll-initiative-for-npcs':
                   result = await combatTools.handleRollInitiativeForNpcs(args);
+
+                  break;
+
+                // Combat resolution (dnd5e)
+
+                case 'apply-damage-and-healing':
+                  result = await combatResolutionTools.handleApplyDamageAndHealing(args);
+
+                  break;
+
+                case 'roll-saving-throws':
+                  result = await combatResolutionTools.handleRollSavingThrows(args);
+
+                  break;
+
+                case 'use-npc-activity':
+                  result = await combatResolutionTools.handleUseNpcActivity(args);
+
+                  break;
+
+                case 'manage-rest':
+                  result = await combatResolutionTools.handleManageRest(args);
 
                   break;
 

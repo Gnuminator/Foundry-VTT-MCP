@@ -9639,6 +9639,330 @@ export class FoundryDataAccess {
       })),
     };
   }
+
+  // ===========================================================================
+  // Combat resolution helpers (dnd5e)
+  // ===========================================================================
+
+  /** Major version of the active game system (e.g. dnd5e 3/4/5). */
+  private systemMajor(): number {
+    return parseInt(String((game.system as any)?.version || '0').split('.')[0], 10) || 0;
+  }
+
+  private requireDnd5e(toolName: string): void {
+    if ((game.system as any)?.id !== 'dnd5e') {
+      throw new Error(`${toolName} requires the dnd5e game system`);
+    }
+  }
+
+  /**
+   * Resolve a damage/roll target to an Actor. Prefers a token on the current
+   * scene (so unlinked NPC tokens use their own synthetic actor/HP), then falls
+   * back to a world actor by name or id.
+   */
+  private resolveTargetActor(identifier: string): any {
+    const scene = (game.scenes as any)?.current;
+    if (scene) {
+      const token = scene.tokens.find(
+        (t: any) => t.id === identifier || t.name?.toLowerCase() === identifier.toLowerCase()
+      );
+      if (token?.actor) return token.actor;
+    }
+    return this.findActorByIdentifier(identifier);
+  }
+
+  private rollModeFor(isPublic: boolean | undefined): string {
+    const modes: any = (CONST as any).DICE_ROLL_MODES || {};
+    return isPublic ? (modes.PUBLIC ?? 'publicroll') : (modes.PRIVATE ?? 'gmroll');
+  }
+
+  /**
+   * Apply damage, healing, or temp HP to one or more targets, using dnd5e's
+   * resistance/vulnerability/immunity math (Actor5e.applyDamage / applyTempHP).
+   */
+  async applyDamageAndHealing(data: {
+    targets: string[];
+    amount: number;
+    kind?: 'damage' | 'healing' | 'temp';
+    type?: string;
+    multiplier?: number;
+    ignoreResistance?: boolean;
+  }): Promise<any> {
+    this.validateFoundryState();
+    this.requireDnd5e('apply-damage-and-healing');
+
+    if (!Array.isArray(data.targets) || data.targets.length === 0) {
+      throw new Error('targets array is required');
+    }
+    const amount = Number(data.amount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new Error('amount must be a non-negative number');
+    }
+    const kind = data.kind || 'damage';
+
+    const results: any[] = [];
+    for (const id of data.targets) {
+      const actor = this.resolveTargetActor(id);
+      if (!actor) {
+        results.push({ target: id, error: 'actor/token not found' });
+        continue;
+      }
+      const hp = actor.system?.attributes?.hp;
+      const before = { value: hp?.value ?? null, temp: hp?.temp ?? 0 };
+      try {
+        if (kind === 'temp') {
+          await actor.applyTempHP(amount);
+        } else if (kind === 'healing') {
+          await actor.applyDamage([{ value: amount, type: 'healing' }]);
+        } else {
+          const opts: any = {};
+          if (data.multiplier != null) opts.multiplier = data.multiplier;
+          if (data.ignoreResistance) opts.ignore = true;
+          // Typed damage → dnd5e applies the actor's DR/DV/DI automatically.
+          await actor.applyDamage([{ value: amount, type: data.type || '' }], opts);
+        }
+        const after = actor.system?.attributes?.hp;
+        results.push({
+          target: actor.name,
+          kind,
+          hpBefore: before,
+          hpAfter: { value: after?.value ?? null, temp: after?.temp ?? 0 },
+        });
+      } catch (err) {
+        results.push({
+          target: actor.name,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    this.auditLog('applyDamageAndHealing', data, 'success');
+    return { success: true, kind, amount, type: data.type ?? null, results };
+  }
+
+  /**
+   * Roll saving throws / ability checks / skill checks for one or more NPC
+   * actors using the dnd5e system rules, optionally vs a DC, reporting pass/fail.
+   * Handles dnd5e v3 (positional id + flat options, single roll, no isSuccess)
+   * and v4/v5 (three config objects, array return, roll.isSuccess).
+   */
+  async rollSavingThrows(data: {
+    targets: string[];
+    rollType: 'save' | 'check' | 'skill';
+    ability?: string;
+    skill?: string;
+    dc?: number;
+    isPublic?: boolean;
+  }): Promise<any> {
+    this.validateFoundryState();
+    this.requireDnd5e('roll-saving-throws');
+
+    if (!Array.isArray(data.targets) || data.targets.length === 0) {
+      throw new Error('targets array is required');
+    }
+    if (data.rollType === 'skill' && !data.skill)
+      throw new Error('skill is required for skill rolls');
+    if (data.rollType !== 'skill' && !data.ability) {
+      throw new Error('ability is required for save/check rolls');
+    }
+
+    const major = this.systemMajor();
+    const rollMode = this.rollModeFor(data.isPublic);
+    const results: any[] = [];
+
+    for (const id of data.targets) {
+      const actor = this.resolveTargetActor(id);
+      if (!actor) {
+        results.push({ target: id, error: 'actor/token not found' });
+        continue;
+      }
+      try {
+        let roll: any;
+        if (major >= 4) {
+          const config: any = {};
+          if (data.rollType === 'skill') config.skill = data.skill;
+          else config.ability = data.ability;
+          if (data.dc != null) config.target = data.dc;
+          const dialog = { configure: false };
+          const message = { create: true, rollMode };
+          const out =
+            data.rollType === 'save'
+              ? await actor.rollSavingThrow(config, dialog, message)
+              : data.rollType === 'skill'
+                ? await actor.rollSkill(config, dialog, message)
+                : await actor.rollAbilityCheck(config, dialog, message);
+          roll = Array.isArray(out) ? out[0] : out;
+        } else {
+          const opts: any = { fastForward: true, chatMessage: true, rollMode };
+          if (data.dc != null) opts.targetValue = data.dc;
+          roll =
+            data.rollType === 'save'
+              ? await actor.rollAbilitySave(data.ability, opts)
+              : data.rollType === 'skill'
+                ? await actor.rollSkill(data.skill, opts)
+                : await actor.rollAbilityTest(data.ability, opts);
+        }
+        const total = roll?.total ?? null;
+        let outcome: boolean | null = null;
+        if (data.dc != null && total != null) {
+          outcome = typeof roll?.isSuccess === 'boolean' ? roll.isSuccess : total >= data.dc;
+        }
+        results.push({ target: actor.name, total, success: outcome });
+      } catch (err) {
+        results.push({
+          target: actor.name,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return {
+      success: true,
+      rollType: data.rollType,
+      dc: data.dc ?? null,
+      results,
+    };
+  }
+
+  /**
+   * Trigger an NPC's attack (or other item activity) and report the attack roll,
+   * hit/miss vs an AC, crit, and damage. dnd5e v3 uses Item-level rollAttack/
+   * rollDamage; v4/v5 use the Activity API.
+   */
+  async useNpcActivity(data: {
+    actorName: string;
+    itemName: string;
+    targetAC?: number;
+    isPublic?: boolean;
+  }): Promise<any> {
+    this.validateFoundryState();
+    this.requireDnd5e('use-npc-activity');
+
+    const actor = this.findActorByIdentifier(data.actorName);
+    if (!actor) throw new Error(`${ERROR_MESSAGES.CHARACTER_NOT_FOUND}: ${data.actorName}`);
+    const item = actor.items.find(
+      (i: any) =>
+        i.id === data.itemName ||
+        i.name?.toLowerCase() === data.itemName.toLowerCase() ||
+        i.name?.toLowerCase().includes(data.itemName.toLowerCase())
+    );
+    if (!item) throw new Error(`Item "${data.itemName}" not found on "${actor.name}"`);
+
+    const major = this.systemMajor();
+    let attackTotal: number | null = null;
+    let isCritical = false;
+    let damageTotal: number | null = null;
+    let formula: string | null = null;
+    let usedActivity = false;
+
+    if (major >= 4) {
+      const activities = (item as any).system?.activities;
+      const attackAct =
+        activities?.getByType?.('attack')?.[0] ||
+        (activities?.contents ?? []).find((a: any) => a.type === 'attack');
+      if (attackAct) {
+        usedActivity = true;
+        const atkOut = await attackAct.rollAttack({}, { configure: false }, { create: true });
+        const atk = Array.isArray(atkOut) ? atkOut[0] : atkOut;
+        attackTotal = atk?.total ?? null;
+        isCritical = atk?.isCritical ?? false;
+        formula = atk?.formula ?? null;
+        const dmgOut = await attackAct.rollDamage(
+          { isCritical },
+          { configure: false },
+          { create: true }
+        );
+        damageTotal = Array.isArray(dmgOut)
+          ? dmgOut.reduce((s: number, r: any) => s + (r.total || 0), 0)
+          : (dmgOut?.total ?? null);
+      } else {
+        // No attack activity — just use the item (posts its card).
+        await (item as any).use({}, { configure: false }, { create: true });
+      }
+    } else {
+      // dnd5e v3 — Item-level rolls
+      const atkOpts: any = { fastForward: true };
+      if (data.targetAC != null) atkOpts.targetValue = data.targetAC;
+      const atk = await (item as any).rollAttack(atkOpts);
+      if (atk) {
+        usedActivity = true;
+        attackTotal = atk.total ?? null;
+        isCritical = atk.isCritical ?? false;
+        formula = atk.formula ?? null;
+        const dmg = await (item as any).rollDamage({
+          critical: isCritical,
+          options: { fastForward: true },
+        });
+        damageTotal = dmg?.total ?? null;
+      } else {
+        await (item as any).use({}, { configureDialog: false, createMessage: true });
+      }
+    }
+
+    const hit = data.targetAC != null && attackTotal != null ? attackTotal >= data.targetAC : null;
+
+    this.auditLog('useNpcActivity', { actor: actor.name, item: item.name }, 'success');
+    return {
+      success: true,
+      actor: actor.name,
+      item: item.name,
+      hadAttack: usedActivity,
+      attackTotal,
+      hit,
+      isCritical,
+      damageTotal,
+      formula,
+    };
+  }
+
+  /**
+   * Run a short or long rest for one or more characters (HP, hit dice, spell
+   * slots, limited-use features) without opening dialogs.
+   */
+  async manageRest(data: {
+    targets: string[];
+    restType: 'short' | 'long';
+    newDay?: boolean;
+  }): Promise<any> {
+    this.validateFoundryState();
+    this.requireDnd5e('manage-rest');
+
+    if (!Array.isArray(data.targets) || data.targets.length === 0) {
+      throw new Error('targets array is required');
+    }
+    const restType = data.restType === 'short' ? 'short' : 'long';
+
+    const results: any[] = [];
+    for (const id of data.targets) {
+      const actor = this.resolveTargetActor(id);
+      if (!actor) {
+        results.push({ target: id, error: 'actor/token not found' });
+        continue;
+      }
+      try {
+        const cfg: any = { dialog: false, chat: false, autoHD: true };
+        cfg.newDay = data.newDay != null ? data.newDay : restType === 'long';
+        const res = restType === 'short' ? await actor.shortRest(cfg) : await actor.longRest(cfg);
+        const hpDelta = res?.deltas?.hitPoints ?? res?.dhp ?? null;
+        const hdDelta = res?.deltas?.hitDice ?? res?.dhd ?? null;
+        const hp = actor.system?.attributes?.hp;
+        results.push({
+          target: actor.name,
+          hpRecovered: hpDelta,
+          hitDiceRecovered: hdDelta,
+          hp: hp ? { value: hp.value ?? null, max: hp.max ?? null } : null,
+        });
+      } catch (err) {
+        results.push({
+          target: actor.name,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    this.auditLog('manageRest', data, 'success');
+    return { success: true, restType, results };
+  }
 }
 
 // =============================================================================

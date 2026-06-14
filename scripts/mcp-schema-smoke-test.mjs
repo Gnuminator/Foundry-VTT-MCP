@@ -24,7 +24,7 @@ const [{ config }, { Logger }, { FoundryClient }, { CharacterTools }, { Compendi
   { ActorCreationTools }, { QuestCreationTools }, { DiceRollTools }, { CampaignManagementTools },
   { OwnershipTools }, { TokenManipulationTools }, { MapGenerationTools },
   { ChatLogTools }, { ResourceTools }, { EffectsTools }, { CombatTools }, { MovementTools },
-  { SessionLogTools }, { getSystemRegistry },
+  { SessionLogTools }, { CombatResolutionTools }, { getSystemRegistry },
   { DnD5eAdapter }, { PF2eAdapter }, { DSA5Adapter }, { CosmereRpgAdapter }] = await Promise.all([
   importDist('config.js'),
   importDist('logger.js'),
@@ -45,6 +45,7 @@ const [{ config }, { Logger }, { FoundryClient }, { CharacterTools }, { Compendi
   importDist('tools/combat.js'),
   importDist('tools/movement.js'),
   importDist('tools/session-log.js'),
+  importDist('tools/combat-resolution.js'),
   importDist('systems/index.js'),
   importDist('systems/dnd5e/adapter.js'),
   importDist('systems/pf2e/adapter.js'),
@@ -78,6 +79,7 @@ const tools = [
   ...new CombatTools({ foundryClient, logger }).getToolDefinitions(),
   ...new MovementTools({ foundryClient, logger }).getToolDefinitions(),
   ...new SessionLogTools({ foundryClient, logger }).getToolDefinitions(),
+  ...new CombatResolutionTools({ foundryClient, logger }).getToolDefinitions(),
 ];
 
 if (!tools.length) {
