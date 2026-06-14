@@ -1,14 +1,10 @@
 name: Build Complete Release
 
+# NOTE (fork): this upstream workflow builds the Windows NSIS installer and pushes
+# to the upstream Foundry registry; it requires secrets this fork does not have, so
+# its automatic triggers are disabled to avoid failing runs. Run manually if needed.
+# Fork releases are handled by release.yml (tag v*) + ci.yml.
 on:
-  push:
-    tags:
-      - 'v*'
-    branches:
-      - feature/nsis-installer
-  pull_request:
-    branches:
-      - master
   workflow_dispatch:
     inputs:
       version:

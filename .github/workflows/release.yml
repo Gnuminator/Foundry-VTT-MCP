@@ -1,0 +1,61 @@
+name: Release Foundry Module
+
+# Cut a release by pushing a tag, e.g.:  git tag v0.11.0 && git push fork v0.11.0
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.11.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build foundry module
+        run: npm run build --workspace=packages/foundry-module
+
+      - name: Validate manifest
+        run: node validate-manifest.js
+
+      - name: Package module
+        run: |
+          set -e
+          mkdir -p build/foundry-mcp-bridge
+          cp packages/foundry-module/module.json build/foundry-mcp-bridge/
+          cp -r packages/foundry-module/dist build/foundry-mcp-bridge/
+          for d in lang styles templates; do
+            if [ -d "packages/foundry-module/$d" ]; then
+              cp -r "packages/foundry-module/$d" build/foundry-mcp-bridge/
+            fi
+          done
+          # Drop sourcemaps / type declarations from the shipped build
+          find build/foundry-mcp-bridge/dist -type f \( -name '*.map' -o -name '*.d.ts' \) -delete
+          (cd build && zip -r foundry-mcp-bridge.zip foundry-mcp-bridge >/dev/null)
+          cp packages/foundry-module/module.json build/module.json
+          echo "Packaged:" && ls -la build
+
+      - name: Create / update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            build/module.json
+            build/foundry-mcp-bridge.zip

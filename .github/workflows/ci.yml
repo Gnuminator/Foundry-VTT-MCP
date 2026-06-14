@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (all workspaces)
+        run: npm run build
+
+      - name: Unit tests (foundry module)
+        # Scoped to the module suite; the root `npm test` includes a pre-existing
+        # upstream suite (dsa5 filters) that reports "no test suite found".
+        run: npm test -w @foundry-mcp/module
+
+      - name: MCP schema smoke test
+        run: node scripts/mcp-schema-smoke-test.mjs
+
+      - name: Validate Foundry module manifest
+        run: node validate-manifest.js
