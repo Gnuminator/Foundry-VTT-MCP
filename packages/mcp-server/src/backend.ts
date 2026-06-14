@@ -1844,6 +1844,16 @@ async function startBackend(): Promise<void> {
 
                   break;
 
+                case 'get-recent-events':
+                  result = await sessionLogTools.handleGetRecentEvents(args);
+
+                  break;
+
+                case 'roll-initiative-for-npcs':
+                  result = await combatTools.handleRollInitiativeForNpcs(args);
+
+                  break;
+
                 default:
                   throw new Error(`Unknown tool: ${name}`);
               }

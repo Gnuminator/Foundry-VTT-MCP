@@ -53,6 +53,21 @@ export class CombatTools {
           required: ['combatantName', 'initiative'],
         },
       },
+      {
+        name: 'roll-initiative-for-npcs',
+        description:
+          'Roll initiative for combatants in the active combat and populate the tracker. scope "npcs" (default) rolls for non-player combatants, "all" rolls for everyone, "missing" only rolls for combatants without an initiative value.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            scope: {
+              type: 'string',
+              enum: ['npcs', 'all', 'missing'],
+              description: 'Which combatants to roll for (default "npcs").',
+            },
+          },
+        },
+      },
     ];
   }
 
@@ -104,6 +119,24 @@ export class CombatTools {
       if (error instanceof z.ZodError) {
         return `Parameter error: ${error.errors.map(e => e.message).join(', ')}`;
       }
+      throw error;
+    }
+  }
+
+  async handleRollInitiativeForNpcs(args: any) {
+    const schema = z.object({ scope: z.enum(['npcs', 'all', 'missing']).optional() });
+    try {
+      const params = schema.parse(args ?? {});
+      const response = await this.foundryClient.query(
+        'foundry-mcp-bridge.rollInitiativeForNpcs',
+        params
+      );
+      if (response?.success === false) {
+        throw new Error(response.error || 'Failed to roll initiative');
+      }
+      return response;
+    } catch (error) {
+      this.logger.error('Error rolling initiative for NPCs', error);
       throw error;
     }
   }

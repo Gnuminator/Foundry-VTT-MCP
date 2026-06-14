@@ -179,6 +179,11 @@ export class QueryHandlers {
 
     // 3H: Session event log
     CONFIG.queries[`${modulePrefix}.getSessionLog`] = this.handleGetSessionLog.bind(this);
+    CONFIG.queries[`${modulePrefix}.getRecentEvents`] = this.handleGetRecentEvents.bind(this);
+
+    // Combat resolution: initiative
+    CONFIG.queries[`${modulePrefix}.rollInitiativeForNpcs`] =
+      this.handleRollInitiativeForNpcs.bind(this);
   }
 
   /**
@@ -2237,6 +2242,42 @@ export class QueryHandlers {
     } catch (error) {
       throw new Error(
         `Failed to get session log: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleGetRecentEvents(data: {
+    sinceTimestamp?: string;
+    limit?: number;
+    eventType?: string;
+  }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.getRecentEvents(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to get recent events: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  // ===== COMBAT RESOLUTION: INITIATIVE =====
+
+  async handleRollInitiativeForNpcs(data: { scope?: 'npcs' | 'all' | 'missing' }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.rollInitiativeForNpcs(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to roll initiative: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

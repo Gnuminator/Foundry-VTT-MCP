@@ -48,6 +48,30 @@ export class SessionLogTools {
           },
         },
       },
+      {
+        name: 'get-recent-events',
+        description:
+          'Low-latency "what happened since timestamp X" delta of session events — for situational awareness during play. Returns the events plus `latestTimestamp`, which you pass back as `sinceTimestamp` next time to poll incrementally for only new events.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            sinceTimestamp: {
+              type: 'string',
+              description:
+                'ISO timestamp; only return events after this time. Omit for the most recent events.',
+            },
+            limit: {
+              type: 'integer',
+              description: 'Maximum number of events to return (default 100).',
+              default: 100,
+            },
+            eventType: {
+              type: 'string',
+              description: 'Optional event type filter.',
+            },
+          },
+        },
+      },
     ];
   }
 
@@ -66,6 +90,25 @@ export class SessionLogTools {
       return response;
     } catch (error) {
       this.logger.error('Error getting session log', error);
+      throw error;
+    }
+  }
+
+  async handleGetRecentEvents(args: any) {
+    const schema = z.object({
+      sinceTimestamp: z.string().optional(),
+      limit: z.number().int().min(1).max(1000).optional(),
+      eventType: z.string().optional(),
+    });
+    try {
+      const params = schema.parse(args ?? {});
+      const response = await this.foundryClient.query('foundry-mcp-bridge.getRecentEvents', params);
+      if (response?.success === false) {
+        throw new Error(response.error || 'Failed to get recent events');
+      }
+      return response;
+    } catch (error) {
+      this.logger.error('Error getting recent events', error);
       throw error;
     }
   }

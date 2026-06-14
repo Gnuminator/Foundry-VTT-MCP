@@ -9566,6 +9566,79 @@ export class FoundryDataAccess {
       events,
     };
   }
+
+  /**
+   * Low-latency "what happened since timestamp X" delta over the tracked events.
+   * Returns `latestTimestamp` so a caller can poll incrementally by passing it
+   * back as `sinceTimestamp` on the next call.
+   */
+  async getRecentEvents(data: {
+    sinceTimestamp?: string;
+    limit?: number;
+    eventType?: string;
+  }): Promise<any> {
+    this.validateFoundryState();
+
+    const filters: { sinceTimestamp?: string; limit?: number; eventType?: string } = {};
+    if (data.sinceTimestamp !== undefined) filters.sinceTimestamp = data.sinceTimestamp;
+    if (data.limit !== undefined) filters.limit = data.limit;
+    if (data.eventType !== undefined) filters.eventType = data.eventType;
+
+    const events = eventTracker.getSessionLog(filters);
+    const latestTimestamp =
+      events.length > 0 ? events[events.length - 1]!.timestamp : (data.sinceTimestamp ?? null);
+
+    return {
+      success: true,
+      count: events.length,
+      events,
+      latestTimestamp,
+      serverTime: new Date().toISOString(),
+    };
+  }
+
+  // ===========================================================================
+  // Combat resolution: initiative
+  // ===========================================================================
+
+  /**
+   * Roll initiative for combatants in the active combat. scope:
+   *  - 'npcs' (default): non-player combatants (Combat#rollNPC)
+   *  - 'all': everyone (Combat#rollAll)
+   *  - 'missing': only combatants without an initiative value
+   */
+  async rollInitiativeForNpcs(data: { scope?: 'npcs' | 'all' | 'missing' }): Promise<any> {
+    this.validateFoundryState();
+
+    const combat: any = (game as any).combat;
+    if (!combat) throw new Error('No active combat encounter.');
+
+    const scope = data.scope || 'npcs';
+
+    if (scope === 'all') {
+      await combat.rollAll();
+    } else if (scope === 'missing') {
+      const ids = (combat.combatants?.contents ?? combat.combatants ?? [])
+        .filter((c: any) => c.initiative === null || c.initiative === undefined)
+        .map((c: any) => c.id);
+      if (ids.length > 0) await combat.rollInitiative(ids);
+    } else {
+      // 'npcs' — Foundry core rolls initiative for all non-player-owned combatants
+      await combat.rollNPC();
+    }
+
+    const turns: any[] = combat.turns ?? [];
+    return {
+      success: true,
+      scope,
+      round: combat.round ?? 0,
+      order: turns.map((c: any) => ({
+        name: c.name,
+        initiative: c.initiative,
+        isPC: !!c.actor?.hasPlayerOwner,
+      })),
+    };
+  }
 }
 
 // =============================================================================

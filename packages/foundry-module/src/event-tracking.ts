@@ -687,6 +687,7 @@ export class EventTracker {
       limit?: number;
       eventType?: string;
       actorName?: string;
+      sinceTimestamp?: string;
     } = {}
   ): SessionLogEntry[] {
     let entries = this.sessionLog.slice();
@@ -697,6 +698,12 @@ export class EventTracker {
     if (filters.actorName) {
       const name = filters.actorName.toLowerCase();
       entries = entries.filter(e => (e.actorName || '').toLowerCase().includes(name));
+    }
+    if (filters.sinceTimestamp) {
+      const since = Date.parse(filters.sinceTimestamp);
+      if (!Number.isNaN(since)) {
+        entries = entries.filter(e => e.timestampMs > since);
+      }
     }
 
     const limit = Math.min(Math.max(filters.limit ?? 100, 1), MAX_SESSION_BUFFER);
