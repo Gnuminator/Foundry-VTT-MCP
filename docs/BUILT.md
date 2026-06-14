@@ -1,10 +1,34 @@
-# What Was Built (v0.9.0 fork)
+# What Was Built (fork)
 
-This fork extends `adambdooley/foundry-vtt-mcp` with **16 new MCP tools** plus the infrastructure
-behind them, taking the bridge from ~40 to **56 tools**. The focus is live play: reading what's
-happening at the table, posting back into it, and tracking session state.
+This fork extends `adambdooley/foundry-vtt-mcp`, taking the bridge from ~40 to **68 tools**:
+**16 tools in v0.9.0** (live-play observation + session state) and **12 more in v0.10.0** (combat
+resolution + scene control). The focus is live play: reading what's happening at the table, posting
+back into it, tracking session state, and now actually _resolving_ a D&D 5e round.
 
 See also: [FIXES.md](FIXES.md), [FEATURE-IDEAS.md](FEATURE-IDEAS.md), [ROADMAP.md](ROADMAP.md).
+
+## v0.10.0 — combat resolution & scene control (12 tools)
+
+Built from the verified dnd5e v3/v4/v5 + Foundry v13 API (version-aware throughout):
+
+- **apply-damage-and-healing** — typed damage/healing/temp HP with automatic resistance math.
+- **roll-saving-throws** — NPC saves/checks/skills vs a DC, reporting pass/fail.
+- **use-npc-activity** — run a monster's attack/activity (attack total, hit, crit, damage).
+- **manage-rest** — short/long rests with dialogs suppressed.
+- **roll-initiative-for-npcs** — roll initiative for npcs/all/missing.
+- **suggest-balanced-encounter** — XP budget (2024 model, 2014 fallback) + CR suggestions.
+- **place-measured-template** — circle/cone/ray/rect AoE + which tokens it covers.
+- **set-scene-mood** — darkness/global light (v13 environment schema) + playlist play/stop.
+- **add-map-note** — journal-linked map pins.
+- **set-token-vision-light** — token sight + emitted light (torch, blinded, …).
+- **drop-loot** — currency + compendium items to a character and/or chat.
+- **get-recent-events** — incremental "since timestamp" session delta for live awareness.
+
+Full parameter/return reference: see the [README](../README.md) ("Combat Resolution & Scene Control").
+
+---
+
+## v0.9.0 — live play & session state (16 tools)
 
 ---
 

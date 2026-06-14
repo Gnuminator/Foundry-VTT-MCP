@@ -203,7 +203,7 @@ class FoundryMCPBridge {
       this.updateLastActivity();
 
       // Update settings display with connection status
-      this.settings.updateConnectionStatusDisplay(true, 56); // MCP tools exposed by the bridge
+      this.settings.updateConnectionStatusDisplay(true, 68); // MCP tools exposed by the bridge
 
       // Start heartbeat monitoring if enabled
       this.startHeartbeat();

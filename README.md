@@ -113,7 +113,10 @@ Once connected, ask Claude Desktop:
 
 ## Features
 
-- **56 MCP Tools** that allow Claude to interact with Foundry
+- **68 MCP Tools** that allow Claude to interact with Foundry
+- **Combat Resolution (v0.10)**: Apply damage/healing with resistance math, roll NPC saves/checks vs DC, run an NPC's attack/activity, roll NPC initiative, and run short/long rests — the AI can actually run a 5e round
+- **Encounter & Scene Control (v0.10)**: XP-budget encounter planning, AoE template placement (with who's-inside), scene mood (lighting/playlists), map pins, token vision/light, and loot awards
+- **Live situational awareness (v0.10)**: `get-recent-events` delta feed for "what just happened"
 - **Combat Play-by-Play & Chat Log**: A live in-memory buffer of chat messages (rolls, damage, flavor, crit/fumble, advantage) plus a structured round-by-round combat summary
 - **In-Character Chat**: Post messages to Foundry chat as a specific character or the GM (ic/ooc/emote/whisper)
 - **Resource Tracking**: Clean, queryable spell slots, class resources (Ki, Rage, Sorcery Points…), item charges, concentration, hit dice, and death saves — with safe updates
@@ -194,6 +197,43 @@ Once connected, ask Claude Desktop:
 - **54** request-attack-roll
 - **55** roll-npc-check
 - **56** get-session-log
+- **57** get-recent-events
+- **58** roll-initiative-for-npcs
+- **59** apply-damage-and-healing (D&D 5e)
+- **60** roll-saving-throws (D&D 5e)
+- **61** use-npc-activity (D&D 5e)
+- **62** manage-rest (D&D 5e)
+- **63** suggest-balanced-encounter (D&D 5e)
+- **64** place-measured-template
+- **65** set-scene-mood
+- **66** add-map-note
+- **67** set-token-vision-light
+- **68** drop-loot
+
+## Combat Resolution & Scene Control (v0.10.0)
+
+These let the AI co-GM **resolve** a D&D 5e round and control the scene, not just observe it.
+
+### Combat resolution (D&D 5e)
+
+- **`apply-damage-and-healing`** — `targets` (token/actor names), `amount`, `kind` (`damage`/`healing`/`temp`), `type` (for resistance math), `multiplier`, `ignoreResistance`. Uses `Actor5e.applyDamage` so the target's own resistances/vulnerabilities/immunities apply automatically.
+- **`roll-saving-throws`** — `targets`, `rollType` (`save`/`check`/`skill`), `ability`/`skill`, `dc`, `isPublic`. Rolls via the dnd5e system (v3/v4/v5-aware) and reports each total + pass/fail.
+- **`use-npc-activity`** — `actorName`, `itemName`, `targetAC`, `isPublic`. Runs a monster's attack/activity and reports attack total, hit/miss, crit, and damage.
+- **`manage-rest`** — `targets`, `restType` (`short`/`long`), `newDay`. Restores HP/hit dice/slots/uses with dialogs suppressed.
+- **`roll-initiative-for-npcs`** — `scope` (`npcs`/`all`/`missing`). Rolls initiative and populates the tracker.
+
+### Encounter & scene
+
+- **`suggest-balanced-encounter`** — `partyLevels?`, `difficulty` (`low`/`moderate`/`high`). Returns the XP budget (2024 model, 2014 fallback) and CR suggestions.
+- **`place-measured-template`** — `shape` (`circle`/`cone`/`ray`/`rect`), `distance`, `x`/`y` or `originTokenName`, `direction`, `angle`, `width`, `fillColor`. Places the AoE and returns `tokensInside`.
+- **`set-scene-mood`** — `darkness` (0–1), `globalLight`, `playlistName`, `playlistAction` (`play`/`stop`).
+- **`add-map-note`** — `text`, `x`/`y` or `tokenName`, `journalName`/`entryId`, `icon`, `iconSize`. Drops a journal-linked map pin.
+- **`set-token-vision-light`** — `tokenName`, `sightEnabled`/`sightRange`/`visionMode`, `lightDim`/`lightBright`/`lightColor`/`lightAnimation`.
+- **`drop-loot`** — `targetCharacter?`, `currency` ({pp,gp,ep,sp,cp}), `itemUuids?`, `announce`. Adds coins/items to a character and/or posts a loot summary.
+
+### Situational awareness
+
+- **`get-recent-events`** — `sinceTimestamp?`, `limit`, `eventType`. Returns session events since a timestamp plus `latestTimestamp` for incremental polling during play.
 
 ## Combat, Chat & Session Tools (v0.9.0)
 
