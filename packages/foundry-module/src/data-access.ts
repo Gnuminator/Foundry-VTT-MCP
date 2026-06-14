@@ -5422,9 +5422,18 @@ export class FoundryDataAccess {
         }
 
         case 'save': {
-          // dnd5e v5: abilities.<x>.save is an object; toMod digs out .value.
-          const ability = rollData.abilities?.[rollTarget];
-          const saveMod = toMod(ability?.save) || toMod(ability?.mod);
+          // dnd5e v5: abilities.<x>.save is an object (not a flat bonus), so we
+          // compute the save modifier from ability mod + proficiency rather than
+          // reading `.save` directly (which omitted save proficiency, e.g. a
+          // creature's DEX save came out +2 instead of +7).
+          const ability = rollData.abilities?.[rollTarget] ?? {};
+          const mod = toMod(ability.mod);
+          const prof = toMod(rollData.attributes?.prof ?? rollData.prof);
+          const proficient = toMod(ability.proficient); // 0 / 0.5 / 1 / 2
+          const computed = mod + Math.round(proficient * prof);
+          // Prefer a directly-exposed numeric save total if it's larger (covers
+          // misc save bonuses); otherwise use the computed value.
+          const saveMod = Math.max(computed, toMod(ability.save));
           baseFormula = `1d20${signed(saveMod)}`;
           break;
         }

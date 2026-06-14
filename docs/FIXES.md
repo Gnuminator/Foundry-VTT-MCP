@@ -107,6 +107,19 @@ in roll data is an **object**, so `buildRollFormula`'s `1d20+${saveMod}` produce
 
 ---
 
+## v0.10.2
+
+### Save rolls missed proficiency (dnd5e v5)
+
+Live testing showed a creature's DEX save came out **+2** (ability mod only) from the formula path
+(`roll-npc-check` and the roll-request **buttons**) vs the correct **+7** from `roll-saving-throws`
+(the dnd5e system roll). On v5 `abilities.<x>.save` is an object, so reading it gave no usable bonus
+and the code fell back to the bare ability mod, dropping save proficiency.
+
+- **Now:** `buildRollFormula`'s save branch computes `mod + round(proficient × proficiencyBonus)` and
+  takes the max with any directly-exposed numeric save total (to also pick up misc bonuses). Ability
+  and skill rolls were already correct (they use `.mod` / skill `.total`).
+
 ## Verification
 
 All fixes are covered by: a clean `npm run build`, the EventTracker unit suite
