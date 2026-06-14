@@ -113,7 +113,7 @@ Once connected, ask Claude Desktop:
 
 ## Features
 
-- **71 MCP Tools** that allow Claude to interact with Foundry
+- **75 MCP Tools** that allow Claude to interact with Foundry
 - **Combat Resolution (v0.10)**: Apply damage/healing with resistance math, roll NPC saves/checks vs DC, run an NPC's attack/activity, roll NPC initiative, and run short/long rests — the AI can actually run a 5e round
 - **Encounter & Scene Control (v0.10)**: XP-budget encounter planning, AoE template placement (with who's-inside), scene mood (lighting/playlists), map pins, token vision/light, and loot awards
 - **Live situational awareness (v0.10)**: `get-recent-events` delta feed for "what just happened"
@@ -212,6 +212,31 @@ Once connected, ask Claude Desktop:
 - **69** delete-measured-template
 - **70** delete-map-note
 - **71** get-targets
+- **72** get-modules
+- **73** get-module-errors
+- **74** clear-module-errors
+- **75** get-module-manifest
+
+## Module Diagnostics (v0.12.0)
+
+Tools for troubleshooting other Foundry modules. The module installs error capture at load time
+(wrapping `console.error`/`console.warn` and listening for uncaught errors and unhandled promise
+rejections), attributes each entry to the offending `/modules/<id>/` via its stack, and buffers them
+(persisted to `localStorage`, so load-time errors survive the reload that often follows). Ask Claude
+for the errors whenever — it's not a live feed.
+
+- **`get-modules`** — installed modules with version, active state, declared compatibility
+  (min/verified/max core), required-dependency satisfaction, and an `issues` list; plus core Foundry
+  and game-system versions. Params: `activeOnly`, `withIssuesOnly`.
+- **`get-module-errors`** — captured errors/warnings with stack + attributed module, and a triage
+  summary (counts by module/level). Params: `level`, `moduleId`, `sinceTimestamp`, `limit`.
+- **`clear-module-errors`** — clear the buffer (e.g. before reproducing an issue).
+- **`get-module-manifest`** — a single module's full manifest (compatibility, relationships, etc.).
+
+**Troubleshooting flow:** when a module misbehaves, ask Claude to pull `get-module-errors` +
+`get-modules`; it correlates the stack's attributed module and flags version/dependency/compatibility
+conflicts, then suggests fixes. For source-level fixes, point Claude Code at the module's GitHub repo
+or the host's `Data/modules/<id>/`. (Errors are captured on the GM client connected to the bridge.)
 
 ## Combat Resolution & Scene Control (v0.10.0)
 

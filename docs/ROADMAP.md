@@ -75,6 +75,15 @@ architecture.
   already has PF2e/DSA5/Cosmere/WFRP adapters. Resource/effect/combat tools could grow per-system
   adapters the way character reads already do.
 
+## Stray thoughts (maybe later)
+
+- **Live error feed in the co-GM dashboard.** The diagnostics buffer (v0.12.0, `get-module-errors`)
+  is pull-based on purpose — you ask for errors when you want them. But the same buffer could be
+  streamed: if/when the co-GM dashboard exists, it could subscribe to new diagnostic entries and
+  surface module errors live (with the AI offering a likely cause/fix as they happen), the same way
+  it would surface combat events. Cheap to add on top of what's already captured; only worth doing
+  once the dashboard is real.
+
 ## Operational
 
 - **Deployment / distribution.** Move to manifest-URL install from a published fork + GitHub Releases
