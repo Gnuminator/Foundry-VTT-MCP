@@ -206,6 +206,12 @@ export class QueryHandlers {
       this.handleDeleteMeasuredTemplate.bind(this);
     CONFIG.queries[`${modulePrefix}.deleteMapNote`] = this.handleDeleteMapNote.bind(this);
     CONFIG.queries[`${modulePrefix}.getTargets`] = this.handleGetTargets.bind(this);
+
+    // Diagnostics (module troubleshooting)
+    CONFIG.queries[`${modulePrefix}.getModules`] = this.handleGetModules.bind(this);
+    CONFIG.queries[`${modulePrefix}.getModuleErrors`] = this.handleGetModuleErrors.bind(this);
+    CONFIG.queries[`${modulePrefix}.clearModuleErrors`] = this.handleClearModuleErrors.bind(this);
+    CONFIG.queries[`${modulePrefix}.getModuleManifest`] = this.handleGetModuleManifest.bind(this);
   }
 
   /**
@@ -2520,6 +2526,74 @@ export class QueryHandlers {
     } catch (error) {
       throw new Error(
         `Failed to get targets: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  // ===== DIAGNOSTICS =====
+
+  async handleGetModules(data: { activeOnly?: boolean; withIssuesOnly?: boolean }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.getModules(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to get modules: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleGetModuleErrors(data: {
+    level?: 'error' | 'warn';
+    moduleId?: string;
+    sinceTimestamp?: string;
+    limit?: number;
+  }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.getModuleErrors(data || {});
+    } catch (error) {
+      throw new Error(
+        `Failed to get module errors: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleClearModuleErrors(): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      return await this.dataAccess.clearModuleErrors();
+    } catch (error) {
+      throw new Error(
+        `Failed to clear module errors: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async handleGetModuleManifest(data: { moduleId: string }): Promise<any> {
+    try {
+      const gmCheck = this.validateGMAccess();
+      if (!gmCheck.allowed) {
+        return { error: 'Access denied', success: false };
+      }
+      this.dataAccess.validateFoundryState();
+      if (!data?.moduleId) throw new Error('moduleId is required');
+      return await this.dataAccess.getModuleManifest(data);
+    } catch (error) {
+      throw new Error(
+        `Failed to get module manifest: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

@@ -5,7 +5,12 @@ import { ModuleSettings } from './settings.js';
 import { CampaignHooks } from './campaign-hooks.js';
 import { ComfyUIManager } from './comfyui-manager.js';
 import { eventTracker } from './session-events.js';
+import { diagnostics } from './diagnostics.js';
 // Connection control now handled through settings menu
+
+// Install diagnostic error capture as early as possible (module evaluation),
+// so the earliest console/uncaught errors from other modules are caught.
+diagnostics.install();
 
 /**
  * Main Foundry MCP Bridge Module Class
@@ -203,7 +208,7 @@ class FoundryMCPBridge {
       this.updateLastActivity();
 
       // Update settings display with connection status
-      this.settings.updateConnectionStatusDisplay(true, 71); // MCP tools exposed by the bridge
+      this.settings.updateConnectionStatusDisplay(true, 75); // MCP tools exposed by the bridge
 
       // Start heartbeat monitoring if enabled
       this.startHeartbeat();

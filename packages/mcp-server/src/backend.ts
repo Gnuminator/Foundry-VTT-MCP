@@ -52,6 +52,7 @@ import { CombatResolutionTools } from './tools/combat-resolution.js';
 import { EncounterTools } from './tools/encounter.js';
 import { SceneControlTools } from './tools/scene-control.js';
 import { LootTools } from './tools/loot.js';
+import { DiagnosticsTools } from './tools/diagnostics.js';
 
 const CONTROL_HOST = '127.0.0.1';
 
@@ -1238,6 +1239,8 @@ async function startBackend(): Promise<void> {
 
   const lootTools = new LootTools({ foundryClient, logger });
 
+  const diagnosticsTools = new DiagnosticsTools({ foundryClient, logger });
+
   // Initialize mapgen-style backend components for map generation
   let mapGenerationJobQueue: any = null;
   let mapGenerationComfyUIClient: any = null;
@@ -1480,6 +1483,8 @@ async function startBackend(): Promise<void> {
     ...sceneControlTools.getToolDefinitions(),
 
     ...lootTools.getToolDefinitions(),
+
+    ...diagnosticsTools.getToolDefinitions(),
   ];
 
   // Start Foundry connector (owns app port 31415)
@@ -1940,6 +1945,28 @@ async function startBackend(): Promise<void> {
 
                 case 'drop-loot':
                   result = await lootTools.handleDropLoot(args);
+
+                  break;
+
+                // Diagnostics (module troubleshooting)
+
+                case 'get-modules':
+                  result = await diagnosticsTools.handleGetModules(args);
+
+                  break;
+
+                case 'get-module-errors':
+                  result = await diagnosticsTools.handleGetModuleErrors(args);
+
+                  break;
+
+                case 'clear-module-errors':
+                  result = await diagnosticsTools.handleClearModuleErrors(args);
+
+                  break;
+
+                case 'get-module-manifest':
+                  result = await diagnosticsTools.handleGetModuleManifest(args);
 
                   break;
 
