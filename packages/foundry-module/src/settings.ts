@@ -267,6 +267,22 @@ export class ModuleSettings {
       },
     });
 
+    // Chat log buffer size — how many recent chat messages the EventTracker
+    // keeps in memory for the get-chat-log / play-by-play tools.
+    game.settings.register(this.moduleId, 'chatLogBufferSize', {
+      name: 'Chat Log Buffer Size',
+      hint: 'Number of recent chat messages to keep in memory for AI chat-log and combat play-by-play tools.',
+      scope: 'world',
+      config: true,
+      type: Number,
+      default: 200,
+      range: {
+        min: 50,
+        max: 1000,
+        step: 50,
+      },
+    });
+
     // Removed 'enableWriteAuditLog' setting as it provides no rollback functionality
     // and only creates log entries without user-actionable features
 
