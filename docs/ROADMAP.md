@@ -37,19 +37,40 @@ See also: [BUILT.md](BUILT.md), [FIXES.md](FIXES.md), [FEATURE-IDEAS.md](FEATURE
 - **Version-robustness.** Keep pinning behavior to the installed system version and lean on the test
   bench after each Foundry/dnd5e update (status classification, `uses.spent` vs `value`, chat
   `style` vs `type` were the historical drift points).
-- **Dashboard design overhaul.** The co-GM dashboard UI is functional but rough/unpolished — it needs
-  a proper visual pass: typography, pane layout/spacing/density, the diagnostics pane, the status bar,
-  and responsiveness. Deferred until the Anthropic API is no longer overloaded (so design iteration
-  with the AI/preview isn't blocked).
+- ✅ **Dashboard design overhaul** _(shipped v0.15.0)_ — "Modern Command Center" redesign: refined
+  typography/spacing/density, reworked diagnostics pane + status bar, and a graduated responsive
+  layout that fixes the mobile overflow. See [COGM-DASHBOARD.md](COGM-DASHBOARD.md).
 
 ### Medium term
 
-- **Dashboard calls tools _back_ into Foundry.** Today the dashboard is read-only + post-to-chat. The
-  next step of a dedicated co-GM client is to let it trigger the combat-resolution tools (behind an
-  explicit confirm) so it can help _run_ the round, not just narrate it.
+- ✅ **Dashboard calls tools _back_ into Foundry** _(shipped v0.15.0)_ — a GM control surface:
+  confirm-gated `/api/tool` proxy (read/write/destructive classification + master GM-Actions switch),
+  a generic schema-driven Tool Runner for every bridge tool, and a curated combat panel with
+  multi-select combatants and a batch action bar.
 - **`wait-for-game-event` long-poll tool** _(optional)_ — the in-Claude-Desktop alternative for
   "while I'm chatting, keep me posted." The dashboard supersedes it for live/autonomous use; only
   build it if the in-chat loop is specifically wanted. Analysis below.
+
+### Make it my own (next major push — added 2026-06-15)
+
+- **Player vs. GM views (role split).** Two views of the dashboard: a **GM view** (everything —
+  Tool Runner + GM Actions — behind auth) and a **player view** showing only what players should see:
+  public combat order, the public feed, no diagnostics, no hidden enemy HP/notes, no write actions.
+  Critical: filter GM-only data **server-side** (the SSE stream and REST endpoints, _not_ just CSS),
+  and gate the write surface behind auth server-side. Players using it means exposing the dashboard
+  beyond `localhost` (LAN/tunnel), so auth + network binding become real security concerns — the
+  bridge can mutate the live game. Auth options to weigh: a shared GM password/token (cookie),
+  separate ports per role, or per-role tokens.
+- **Redesign the GitHub front page (README) from scratch.** The README is still the upstream one;
+  rewrite it around this fork's identity and the co-GM dashboard — what it is, the dashboard feature
+  set, screenshots (reuse the `docs/COGM-DASHBOARD.md` assets), install/run, supported systems.
+- **Detach from upstream & make it original.** Stop tracking the `origin` (adambdooley) remote and
+  reimplement the codebase as _its own thing built from the idea_ rather than a fork of the original
+  source. Licensing note (not legal advice — worth confirming): upstream is MIT-licensed, so a
+  genuine from-scratch reimplementation that shares no original code can carry your own
+  authorship/license; any retained original code must keep its MIT copyright + license. Also rebrand
+  the manifest (`module.json` authors/title/id) and docs. Large, staged effort — sequence it
+  module-by-module.
 
 ---
 
