@@ -31,6 +31,12 @@
       </div>
 
       <div class="controls">
+        <button id="btn-gm" class="btn" title="Master switch for game-changing actions">
+          ⚔ GM Actions: off
+        </button>
+        <button id="btn-tools" class="btn" title="Open the tool runner (run any bridge tool)">
+          🛠 Tools
+        </button>
         <button id="btn-pause" class="btn" title="Pause / resume auto commentary">⏸ Pause</button>
         <button id="btn-diag" class="btn" title="Toggle AI commentary on module errors">
           🩺 Diag AI: on
@@ -60,6 +66,7 @@
           <h2>Combat Tracker</h2>
           <span class="pane-meta" id="combat-meta">—</span>
         </div>
+        <div class="combat-actions" id="combat-actions" hidden></div>
         <div class="pane-body" id="combat-body">
           <p class="empty">No active combat.</p>
         </div>
@@ -108,6 +115,64 @@
         </div>
       </section>
     </main>
+
+    <!-- GM Tool Runner drawer -->
+    <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+    <aside class="drawer" id="tools-drawer" hidden aria-label="GM tool runner">
+      <div class="drawer-head">
+        <div>
+          <h2>🛠 Tool Runner</h2>
+          <span class="drawer-sub">Run any Foundry bridge tool</span>
+        </div>
+        <button class="icon-btn" id="drawer-close" title="Close" aria-label="Close">✕</button>
+      </div>
+      <div class="gm-gate" id="gm-gate" hidden>
+        <span
+          >⚠ GM Actions are <strong>off</strong>. Reads work; game-changing tools stay blocked
+          until you enable them.</span
+        >
+        <button class="btn btn-primary" id="gm-gate-enable">Enable GM Actions</button>
+      </div>
+      <div class="tool-browser" id="tool-browser">
+        <input
+          id="tool-search"
+          class="ask-input"
+          type="text"
+          placeholder="Search tools…"
+          autocomplete="off"
+        />
+        <div class="tool-list" id="tool-list"><p class="empty">Loading tools…</p></div>
+      </div>
+      <div class="tool-detail" id="tool-detail" hidden>
+        <button class="link-btn" id="tool-back">‹ All tools</button>
+        <div class="tool-detail-head">
+          <h3 id="tool-detail-name"></h3>
+          <span class="tool-kind" id="tool-detail-kind"></span>
+        </div>
+        <p class="tool-detail-desc" id="tool-detail-desc"></p>
+        <form class="tool-form" id="tool-form" autocomplete="off"></form>
+        <div class="tool-result" id="tool-result" hidden></div>
+      </div>
+    </aside>
+
+    <!-- Confirm modal -->
+    <div class="modal-backdrop" id="modal-backdrop" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <h3 id="modal-title">Confirm action</h3>
+        <div class="modal-body" id="modal-body"></div>
+        <label class="modal-destructive" id="modal-destructive" hidden>
+          <input type="checkbox" id="modal-destructive-check" />
+          <span>I understand this changes the live game and may be hard to undo.</span>
+        </label>
+        <div class="modal-actions">
+          <button class="btn" id="modal-cancel">Cancel</button>
+          <button class="btn btn-primary" id="modal-confirm">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
 
     <script type="module" src="./app.js"></script>
   </body>

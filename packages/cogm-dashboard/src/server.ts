@@ -1,7 +1,7 @@
 import express, { type Request, type Response } from 'express';
 import { config, type Tone } from './config.js';
 import { Logger } from './logger.js';
-import { McpControlClient } from './feed/mcp-control-client.js';
+import { McpControlClient, ToolError, TimeoutError } from './feed/mcp-control-client.js';
 import { PollingGameFeed } from './feed/polling-feed.js';
 import type { BridgeStatus, CombatState, GameFeedHandlers, WorldInfo } from './feed/types.js';
 import { GameState } from './state.js';
@@ -26,12 +26,15 @@ interface RuntimeSettings {
   tone: Tone;
   model: string;
   commentOnErrors: boolean;
+  /** Master switch for the write surface (GM Actions). Off by default for safety. */
+  gmActionsEnabled: boolean;
 }
 const settings: RuntimeSettings = {
   paused: false,
   tone: config.defaultTone,
   model: config.anthropicModel,
   commentOnErrors: config.commentOnErrors,
+  gmActionsEnabled: false,
 };
 
 // --- Core singletons ---------------------------------------------------------
@@ -97,6 +100,7 @@ function settingsPayload(): Record<string, unknown> {
     model: settings.model,
     aiEnabled: coGm.enabled,
     commentOnErrors: settings.commentOnErrors,
+    gmActionsEnabled: settings.gmActionsEnabled,
     pollIntervalMs: config.pollIntervalMs,
     commentMinIntervalMs: config.commentMinIntervalMs,
   };
@@ -112,6 +116,63 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function readStr(value: unknown, fallback: string): string {
   return typeof value === 'string' ? value : fallback;
+}
+
+// --- GM Actions: tool proxy --------------------------------------------------
+// The dashboard can invoke ANY bridge tool, but game-changing (write) tools are
+// gated behind the master GM-Actions switch + an explicit confirm, and a small
+// set of destructive tools needs a second confirm. Reads are always free.
+const DESTRUCTIVE_TOOLS = new Set<string>([
+  'delete-tokens',
+  'delete-map-note',
+  'delete-measured-template',
+  'remove-actor-ownership',
+  'clear-module-errors',
+  'clear-stale-conditions',
+]);
+// Tools that read state but don't match the get-/list-/search-/measure- prefixes.
+const READ_TOOLS_EXTRA = new Set<string>(['check-map-status', 'suggest-balanced-encounter']);
+
+type ToolKind = 'read' | 'write' | 'destructive';
+
+function classifyTool(name: string): ToolKind {
+  if (DESTRUCTIVE_TOOLS.has(name)) return 'destructive';
+  if (/^(get|list|search|measure)-/.test(name) || READ_TOOLS_EXTRA.has(name)) return 'read';
+  return 'write';
+}
+
+interface ToolInfo {
+  name: string;
+  description: string;
+  inputSchema: unknown;
+  mutates: ToolKind;
+}
+
+let toolCatalog: ToolInfo[] | null = null;
+let toolCatalogAt = 0;
+const TOOL_CATALOG_TTL_MS = 60_000;
+
+async function getToolCatalog(force = false): Promise<ToolInfo[]> {
+  if (!force && toolCatalog && Date.now() - toolCatalogAt < TOOL_CATALOG_TTL_MS) {
+    return toolCatalog;
+  }
+  const raw = await client.listTools();
+  const tools = raw
+    .map(asRecord)
+    .filter(t => typeof t.name === 'string')
+    .map<ToolInfo>(t => {
+      const name = t.name as string;
+      return {
+        name,
+        description: readStr(t.description, ''),
+        inputSchema: t.inputSchema ?? { type: 'object', properties: {} },
+        mutates: classifyTool(name),
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  toolCatalog = tools;
+  toolCatalogAt = Date.now();
+  return tools;
 }
 
 function mapWorld(raw: unknown): WorldInfo {
@@ -320,6 +381,12 @@ app.post('/api/control', (req: Request, res: Response) => {
     case 'set-diag':
       settings.commentOnErrors = value === true;
       break;
+    case 'toggle-gm-actions':
+      settings.gmActionsEnabled = !settings.gmActionsEnabled;
+      break;
+    case 'set-gm-actions':
+      settings.gmActionsEnabled = value === true;
+      break;
     default:
       res.status(400).json({ error: `Unknown action: ${action || '(none)'}` });
       return;
@@ -349,6 +416,65 @@ app.post('/api/post-chat', (req: Request, res: Response) => {
     .catch((error: unknown) => {
       res.status(502).json({
         error: error instanceof Error ? error.message : 'Failed to post to Foundry chat.',
+      });
+    });
+});
+
+// --- GM Actions: list + invoke bridge tools ----------------------------------
+app.get('/api/tools', (req: Request, res: Response) => {
+  getToolCatalog(req.query.refresh === '1')
+    .then(tools => res.json({ tools, gmActionsEnabled: settings.gmActionsEnabled }))
+    .catch((error: unknown) => {
+      res.status(502).json({
+        error: error instanceof Error ? error.message : 'Failed to list bridge tools.',
+      });
+    });
+});
+
+app.post('/api/tool', (req: Request, res: Response) => {
+  const body = asRecord(req.body);
+  const name = readStr(body.name, '').trim();
+  if (!name) {
+    res.status(400).json({ error: 'A non-empty "name" is required.' });
+    return;
+  }
+  const args = asRecord(body.args);
+  const mutates = classifyTool(name);
+
+  if (mutates !== 'read') {
+    if (!settings.gmActionsEnabled) {
+      res.status(403).json({
+        code: 'gm-actions-disabled',
+        error: 'GM Actions are off. Turn on the GM Actions switch to run game-changing tools.',
+      });
+      return;
+    }
+    if (body.confirm !== true) {
+      res.status(412).json({ code: 'confirm-required', mutates, error: 'Confirmation required.' });
+      return;
+    }
+    if (mutates === 'destructive' && body.confirmDestructive !== true) {
+      res.status(412).json({
+        code: 'confirm-destructive-required',
+        mutates,
+        error: 'This action is destructive and needs explicit confirmation.',
+      });
+      return;
+    }
+    logger.info('GM Action invoked', { tool: name, mutates });
+  }
+
+  client
+    .callTool(name, args)
+    .then(result => res.json({ ok: true, name, mutates, result }))
+    .catch((error: unknown) => {
+      const kind =
+        error instanceof ToolError ? 'tool' : error instanceof TimeoutError ? 'timeout' : 'channel';
+      res.status(kind === 'tool' ? 422 : 502).json({
+        ok: false,
+        name,
+        kind,
+        error: error instanceof Error ? error.message : 'Tool call failed.',
       });
     });
 });

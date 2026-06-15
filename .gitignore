@@ -72,6 +72,9 @@ installer/*.zip
 # Temporary Scripts
 test-*.ps1
 
+# Co-GM dashboard design/dev harness (untracked, not shipped)
+packages/cogm-dashboard/public/_*.html
+
 # Local Configuration
 config.local.json
 .claude/foundry-mcp-server-*.zip
