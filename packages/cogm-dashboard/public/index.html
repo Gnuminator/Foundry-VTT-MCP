@@ -32,6 +32,9 @@
 
       <div class="controls">
         <button id="btn-pause" class="btn" title="Pause / resume auto commentary">⏸ Pause</button>
+        <button id="btn-diag" class="btn" title="Toggle AI commentary on module errors">
+          🩺 Diag AI: on
+        </button>
         <label class="control-label">
           Tone
           <select id="select-tone" class="select">
@@ -92,6 +95,17 @@
           />
           <button class="btn btn-primary" type="submit">Ask</button>
         </form>
+      </section>
+
+      <!-- Module diagnostics -->
+      <section class="pane" id="pane-diagnostics">
+        <div class="pane-head">
+          <h2>Module Diagnostics</h2>
+          <span class="pane-meta" id="diag-meta">0 issues</span>
+        </div>
+        <div class="pane-body" id="diag-body">
+          <p class="empty">No module errors captured.</p>
+        </div>
       </section>
     </main>
 

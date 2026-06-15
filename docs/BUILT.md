@@ -1,11 +1,30 @@
 # What Was Built (fork)
 
-This fork extends `adambdooley/foundry-vtt-mcp`, taking the bridge from ~40 to **68 tools**:
-**16 tools in v0.9.0** (live-play observation + session state) and **12 more in v0.10.0** (combat
-resolution + scene control). The focus is live play: reading what's happening at the table, posting
-back into it, tracking session state, and now actually _resolving_ a D&D 5e round.
+This fork extends `adambdooley/foundry-vtt-mcp`, taking the bridge from ~40 to **~75 tools** across
+v0.9.0–v0.13.0: **16 tools in v0.9.0** (live-play observation + session state), **12 more in v0.10.0**
+(combat resolution + scene control), and **module diagnostics in v0.12.0**. v0.13.0 also adds a
+standalone **co-GM dashboard** (a separate app, not a tool — see below). The focus is live play:
+reading what's happening at the table, posting back into it, tracking session state, resolving a
+D&D 5e round, and surfacing module health.
 
 See also: [FIXES.md](FIXES.md), [FEATURE-IDEAS.md](FEATURE-IDEAS.md), [ROADMAP.md](ROADMAP.md).
+
+## v0.12.0–v0.13.0 — diagnostics & the co-GM dashboard
+
+- **Module diagnostics (v0.12.0)** — `get-module-errors` (captured console errors/warnings with
+  stacks + per-module triage), `get-modules` (versions, compatibility, dependency issues),
+  `get-module-manifest`, `clear-module-errors`. A pull-based, GM-gated client diagnostics buffer.
+- **Co-GM dashboard (v0.13.0, `packages/cogm-dashboard`)** — a standalone Node/TypeScript app (NOT a
+  Foundry/MCP tool) that pulls the live feed off the bridge control channel and streams Claude
+  commentary to a browser:
+  - live panes — event feed, combat tracker, streaming AI commentary, and a **live module-error
+    feed**; controls for pause/resume, tone, model, "ask the co-GM", "Diag AI", and post-to-chat;
+  - a hardened reconnecting MCP control client (TCP keepalive, app-level heartbeat, connect/request
+    timeouts that force a reconnect, half-open recovery);
+  - read-only except the explicit post-to-chat; prompt caching on the static persona for cost control.
+  - See `packages/cogm-dashboard/README.md`.
+
+---
 
 ## v0.10.0 — combat resolution & scene control (12 tools)
 

@@ -23,6 +23,10 @@ dashboard, and can optionally post a chosen comment back to Foundry chat.
   current game state.
 - **Post to chat** _(the only thing that mutates the game)_ — push a chosen
   comment into Foundry as a GM whisper.
+- **Live module diagnostics** — polls `get-module-errors` and streams other
+  modules' errors/warnings to a diagnostics pane; the co-GM can offer a likely
+  cause/fix on new errors (toggleable "Diag AI", rate-capped, and deferred so it
+  never preempts combat commentary).
 
 Everything else is strictly read-only.
 
@@ -31,11 +35,11 @@ Everything else is strictly read-only.
 ```
  Foundry VTT  ──►  MCP backend  ──(JSON-lines TCP 127.0.0.1:31414)──►  Co-GM dashboard
   (browser)        (bridge)              control channel                   │
-                                                                           ├─ PollingGameFeed  (get-recent-events / get-combat-state)
+                                                                           ├─ PollingGameFeed  (get-recent-events / get-combat-state / get-module-errors)
                                                                            ├─ GameState        (bounded rolling window + combat snapshot)
                                                                            ├─ CoGm             (@anthropic-ai/sdk, streaming + prompt caching)
-                                                                           ├─ CommentaryEngine (batch / debounce / frequency cap)
-                                                                           └─ Express + SSE    ──►  browser dashboard (3 panes)
+                                                                           ├─ CommentaryEngine + ErrorCommentaryEngine (batch / debounce / cap)
+                                                                           └─ Express + SSE    ──►  browser dashboard (4 panes)
 ```
 
 The feed sits behind a `GameFeed` interface (`src/feed/types.ts`), so the
@@ -52,6 +56,7 @@ without touching the rest of the app.
 | `src/ai/prompt.ts`               | Persona / 5e reference, event-significance rules, prompt assembly |
 | `src/ai/anthropic-co-gm.ts`      | Streaming Messages API wrapper with prompt caching                |
 | `src/ai/commentary.ts`           | Batches/debounces events into paced comments                      |
+| `src/ai/error-commentary.ts`     | Batches module errors into paced diagnostics comments             |
 | `src/sse.ts`                     | Server-Sent Events hub                                            |
 | `src/server.ts`                  | Express wiring, REST + SSE endpoints                              |
 | `public/`                        | Vanilla-JS dashboard (no build step)                              |
@@ -108,6 +113,19 @@ All via `.env` (see `.env.example`):
 | `MCP_CONTROL_HOST` / `MCP_CONTROL_PORT` | `127.0.0.1` / `31414` | Bridge control channel                              |
 | `PORT`                                  | `3000`                | Dashboard HTTP/SSE port                             |
 | `COGM_TONE`                             | `tactical`            | Starting tone (`tactical` \| `narrative`)           |
+
+Additional knobs (all optional — defaults shown; see `.env.example`):
+
+| Variable                        | Default | Purpose                                                |
+| ------------------------------- | ------- | ------------------------------------------------------ |
+| `ERROR_POLL_INTERVAL_MS`        | `6000`  | Module-diagnostics poll cadence                        |
+| `COGM_MAX_ERRORS`               | `100`   | Rolling module-error buffer size                       |
+| `COGM_COMMENT_ON_ERRORS`        | `true`  | AI auto-comments on new module errors (UI: "Diag AI")  |
+| `ERROR_COMMENT_MIN_INTERVAL_MS` | `60000` | Minimum spacing between diagnostics comments           |
+| `MCP_REQUEST_TIMEOUT_MS`        | `15000` | Per-request timeout (a timeout forces a reconnect)     |
+| `MCP_CONNECT_TIMEOUT_MS`        | `5000`  | TCP connect timeout                                    |
+| `MCP_HEARTBEAT_INTERVAL_MS`     | `10000` | Heartbeat ping cadence (half-open detection)           |
+| `MCP_STALENESS_THRESHOLD_MS`    | `30000` | Window after last reply before the channel reads stale |
 
 ## Cost control
 

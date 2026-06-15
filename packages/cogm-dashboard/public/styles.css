@@ -157,9 +157,13 @@ body {
   flex: 1;
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr) minmax(320px, 1.2fr);
+  grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
   gap: 0.75rem;
   padding: 0.75rem;
   min-height: 0;
+}
+#pane-diagnostics {
+  grid-column: 1 / -1;
 }
 .pane {
   background: var(--bg-panel);
@@ -366,6 +370,64 @@ body {
 }
 .comment.kind-ask {
   border-color: var(--pc);
+}
+.comment.kind-diagnostic {
+  border-color: var(--warn);
+}
+.comment-badge.diagnostic {
+  background: rgba(224, 168, 60, 0.18);
+  color: var(--warn);
+}
+
+/* ---- Diag toggle + module diagnostics ---- */
+.btn.toggle-off {
+  opacity: 0.5;
+}
+.diag-entry {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  margin-bottom: 0.25rem;
+  background: var(--bg-elev);
+  border-radius: 6px;
+  border-left: 3px solid var(--grey);
+  font-size: 0.78rem;
+}
+.diag-entry.lvl-error {
+  border-left-color: var(--bad);
+}
+.diag-entry.lvl-warn {
+  border-left-color: var(--warn);
+}
+.diag-level {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.diag-entry.lvl-error .diag-level {
+  color: var(--bad);
+}
+.diag-entry.lvl-warn .diag-level {
+  color: var(--warn);
+}
+.diag-module {
+  font-size: 0.66rem;
+  color: var(--npc);
+  white-space: nowrap;
+}
+.diag-msg {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diag-time {
+  font-size: 0.64rem;
+  color: var(--text-dim);
+  white-space: nowrap;
 }
 .comment-head {
   display: flex;

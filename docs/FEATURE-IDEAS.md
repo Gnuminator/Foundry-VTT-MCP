@@ -1,5 +1,9 @@
 # Feature Ideas (researched & feasibility-checked)
 
+> **Status (v0.13.0): largely shipped.** Tiers 1–3 below were built across v0.10.0, and
+> `get-recent-events` shipped as well. This file is kept for the rationale/feasibility notes and the
+> "considered and rejected" section, which still document _why_ things are (or aren't) built.
+
 Candidate new tools for the bridge, verified against the Foundry VTT v13/v14 core API and the dnd5e
 system (v4/v5 Activity model). Each idea reuses the existing pattern: a `CONFIG.queries` handler in
 the Foundry module + an MCP tool wrapper.

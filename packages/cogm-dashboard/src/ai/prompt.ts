@@ -1,5 +1,5 @@
 import type { Tone } from '../config.js';
-import type { SessionEvent, WorldInfo } from '../feed/types.js';
+import type { ModuleError, SessionEvent, WorldInfo } from '../feed/types.js';
 
 /**
  * Prompt construction and event-significance rules for the AI co-GM.
@@ -242,4 +242,32 @@ ${context}
 The GM asks: "${question}"
 
 Answer concisely and practically, grounded in the current game state above. If the answer depends on a rule or fact you don't have, say what you'd check.`;
+}
+
+/**
+ * Whether a module error is worth an AI comment: errors only (warnings are
+ * mostly deprecation noise), and not an obvious deprecation message.
+ */
+export function isSignificantError(error: ModuleError): boolean {
+  if (error.level !== 'error') return false;
+  return !/deprecat|now namespaced|renamed to|will be removed/i.test(error.message);
+}
+
+/**
+ * Volatile user turn for a diagnostics comment. Reframes the co-GM as a Foundry
+ * technical assistant for this one turn (the cached system block is unchanged,
+ * so the prompt cache stays warm).
+ */
+export function buildErrorCommentMessage(errors: ModuleError[]): string {
+  const lines = errors.slice(0, 4).map(e => {
+    const mod = e.module ?? 'unknown source';
+    const stack = e.stack ? `\n    ${e.stack.split('\n').slice(0, 3).join('\n    ')}` : '';
+    return `- [${mod}] ${e.message}${stack}`;
+  });
+  return `Switch hats: you are now a Foundry VTT technical assistant helping the GM keep their game stable.
+
+A module error just occurred in Foundry:
+${lines.join('\n')}
+
+In ONE or TWO sentences, give the GM the most likely cause and a concrete fix (which module to update/disable, a setting to change, or a data fix). If it is harmless deprecation noise, say so briefly. Output only the diagnosis.`;
 }

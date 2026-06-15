@@ -7,6 +7,7 @@ import type { BridgeStatus, CombatState, GameFeedHandlers, WorldInfo } from './f
 import { GameState } from './state.js';
 import { CoGm } from './ai/anthropic-co-gm.js';
 import { CommentaryEngine } from './ai/commentary.js';
+import { ErrorCommentaryEngine } from './ai/error-commentary.js';
 import { buildAskUserMessage } from './ai/prompt.js';
 import { SseHub } from './sse.js';
 
@@ -24,21 +25,27 @@ interface RuntimeSettings {
   paused: boolean;
   tone: Tone;
   model: string;
+  commentOnErrors: boolean;
 }
 const settings: RuntimeSettings = {
   paused: false,
   tone: config.defaultTone,
   model: config.anthropicModel,
+  commentOnErrors: config.commentOnErrors,
 };
 
 // --- Core singletons ---------------------------------------------------------
-const state = new GameState(config.maxEvents);
+const state = new GameState(config.maxEvents, config.maxErrors);
 const coGm = new CoGm(config.anthropicApiKey, logger);
 const sse = new SseHub(logger);
 const client = new McpControlClient({
   host: config.mcpHost,
   port: config.mcpPort,
   logger,
+  requestTimeoutMs: config.controlRequestTimeoutMs,
+  connectTimeoutMs: config.controlConnectTimeoutMs,
+  heartbeatIntervalMs: config.controlHeartbeatIntervalMs,
+  stalenessThresholdMs: config.controlStalenessThresholdMs,
 });
 
 const commentary = new CommentaryEngine({
@@ -54,6 +61,19 @@ const commentary = new CommentaryEngine({
   minIntervalMs: config.commentMinIntervalMs,
   debounceMs: config.commentDebounceMs,
   maxTokens: config.commentMaxTokens,
+});
+
+const errorCommentary = new ErrorCommentaryEngine({
+  coGm,
+  logger,
+  broadcast: (type: string, payload: unknown): void => sse.broadcast(type, payload),
+  settings: {
+    getModel: (): string => settings.model,
+    isEnabled: (): boolean => settings.commentOnErrors,
+  },
+  minIntervalMs: config.errorCommentMinIntervalMs,
+  debounceMs: config.commentDebounceMs,
+  maxTokens: config.errorCommentMaxTokens,
 });
 
 // --- Live status / world -----------------------------------------------------
@@ -76,6 +96,7 @@ function settingsPayload(): Record<string, unknown> {
     tone: settings.tone,
     model: settings.model,
     aiEnabled: coGm.enabled,
+    commentOnErrors: settings.commentOnErrors,
     pollIntervalMs: config.pollIntervalMs,
     commentMinIntervalMs: config.commentMinIntervalMs,
   };
@@ -168,6 +189,12 @@ const handlers: GameFeedHandlers = {
     sse.broadcast('events', { events: added, initial: meta.initial });
     if (!meta.initial) commentary.notifyEvents(added);
   },
+  onErrors(errors, meta) {
+    const added = state.addErrors(errors);
+    if (added.length === 0) return;
+    sse.broadcast('errors', { errors: added, initial: meta.initial });
+    if (!meta.initial) errorCommentary.notifyErrors(added);
+  },
   onCombat(combat: CombatState | null) {
     const prevSignature = state.combatSignature();
     state.setCombat(combat);
@@ -189,6 +216,7 @@ const handlers: GameFeedHandlers = {
 const feed = new PollingGameFeed(client, handlers, {
   pollIntervalMs: config.pollIntervalMs,
   combatPollIntervalMs: config.combatPollIntervalMs,
+  errorPollIntervalMs: config.errorPollIntervalMs,
   logger,
   backfillLimit: 25,
 });
@@ -207,6 +235,7 @@ app.get('/api/state', (_req: Request, res: Response) => {
     status: currentStatus,
     combat: state.combat,
     events: state.recentEvents,
+    errors: state.recentErrors,
     settings: settingsPayload(),
     world,
   });
@@ -220,6 +249,7 @@ app.get('/api/stream', (_req: Request, res: Response) => {
   sse.send(res, 'settings', settingsPayload());
   if (state.combat) sse.send(res, 'combat', { combat: state.combat });
   sse.send(res, 'events', { events: state.recentEvents, initial: true });
+  sse.send(res, 'errors', { errors: state.recentErrors, initial: true });
 });
 
 app.post('/api/ask', (req: Request, res: Response) => {
@@ -283,6 +313,12 @@ app.post('/api/control', (req: Request, res: Response) => {
       break;
     case 'set-model':
       if (typeof value === 'string' && value.trim() !== '') settings.model = value.trim();
+      break;
+    case 'toggle-diag':
+      settings.commentOnErrors = !settings.commentOnErrors;
+      break;
+    case 'set-diag':
+      settings.commentOnErrors = value === true;
       break;
     default:
       res.status(400).json({ error: `Unknown action: ${action || '(none)'}` });

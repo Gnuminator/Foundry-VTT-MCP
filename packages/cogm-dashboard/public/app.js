@@ -10,6 +10,7 @@ const els = {
   statusFoundry: $('status-foundry'),
   statusAi: $('status-ai'),
   btnPause: $('btn-pause'),
+  btnDiag: $('btn-diag'),
   selectTone: $('select-tone'),
   selectModel: $('select-model'),
   combatMeta: $('combat-meta'),
@@ -18,14 +19,24 @@ const els = {
   feedBody: $('feed-body'),
   aiMeta: $('ai-meta'),
   aiBody: $('ai-body'),
+  diagMeta: $('diag-meta'),
+  diagBody: $('diag-body'),
   askForm: $('ask-form'),
   askInput: $('ask-input'),
 };
 
 const seenEventIds = new Set();
 let eventCount = 0;
+const seenErrorIds = new Set();
+const errorCounts = { error: 0, warn: 0 };
 const comments = new Map(); // genId -> { card, body, doneText }
-let settings = { paused: false, tone: 'tactical', model: 'claude-opus-4-8', aiEnabled: false };
+let settings = {
+  paused: false,
+  tone: 'tactical',
+  model: 'claude-opus-4-8',
+  aiEnabled: false,
+  commentOnErrors: true,
+};
 
 // ---------------------------------------------------------------------------
 // REST helpers
@@ -68,11 +79,16 @@ function renderSettings(next) {
   els.btnPause.classList.toggle('paused', settings.paused);
   els.selectTone.value = settings.tone;
   if (settings.model) els.selectModel.value = settings.model;
+  els.btnDiag.textContent = settings.commentOnErrors ? '🩺 Diag AI: on' : '🩺 Diag AI: off';
+  els.btnDiag.classList.toggle('toggle-off', !settings.commentOnErrors);
   if (settings.aiEnabled) {
     setDot(els.statusAi, 'dot-green', `AI: ${settings.paused ? 'paused' : 'on'}`);
+    els.btnPause.disabled = false;
+    els.btnDiag.disabled = false;
   } else {
     setDot(els.statusAi, 'dot-red', 'AI: disabled');
     els.btnPause.disabled = true;
+    els.btnDiag.disabled = true;
     els.askInput.placeholder = 'Set ANTHROPIC_API_KEY to enable the co-GM';
   }
 }
@@ -167,15 +183,49 @@ function addEvents(events) {
 }
 
 // ---------------------------------------------------------------------------
+// Module diagnostics (newest on top)
+// ---------------------------------------------------------------------------
+function addErrors(errors) {
+  if (!errors || errors.length === 0) return;
+  if (els.diagBody.querySelector('.empty')) els.diagBody.innerHTML = '';
+
+  for (const er of errors) {
+    if (seenErrorIds.has(er.id)) continue;
+    seenErrorIds.add(er.id);
+    if (er.level === 'warn') errorCounts.warn += 1;
+    else errorCounts.error += 1;
+
+    const time = new Date(er.timestampMs).toLocaleTimeString();
+    const mod = (er.module || '').replace(/^(module|system|world):/, '') || 'unknown';
+    const node = document.createElement('div');
+    node.className = `diag-entry lvl-${er.level === 'warn' ? 'warn' : 'error'}`;
+    node.title = er.message + (er.stack ? `\n\n${er.stack}` : '');
+    node.innerHTML = `
+      <span class="diag-level">${er.level === 'warn' ? 'warn' : 'error'}</span>
+      <span class="diag-module">${escapeHtml(mod)}</span>
+      <span class="diag-msg">${escapeHtml(er.message)}</span>
+      <span class="diag-time">${time}</span>`;
+    els.diagBody.insertBefore(node, els.diagBody.firstChild);
+  }
+
+  while (els.diagBody.children.length > 150) {
+    els.diagBody.removeChild(els.diagBody.lastChild);
+  }
+  els.diagMeta.textContent = `${errorCounts.error} errors · ${errorCounts.warn} warns`;
+}
+
+// ---------------------------------------------------------------------------
 // AI commentary
 // ---------------------------------------------------------------------------
 function commentStart(d) {
   if (els.aiBody.querySelector('.empty')) els.aiBody.innerHTML = '';
+  const kindLabel = d.kind === 'ask' ? 'Ask' : d.kind === 'diagnostic' ? 'Diag' : 'Auto';
+  const badgeClass = d.kind === 'ask' ? 'ask' : d.kind === 'diagnostic' ? 'diagnostic' : '';
   const card = document.createElement('div');
   card.className = `comment kind-${d.kind}`;
   card.innerHTML = `
     <div class="comment-head">
-      <span class="comment-badge ${d.kind === 'ask' ? 'ask' : ''}">${d.kind === 'ask' ? 'Ask' : 'Auto'} · ${escapeHtml(d.tone || '')}</span>
+      <span class="comment-badge ${badgeClass}">${kindLabel} · ${escapeHtml(d.tone || '')}</span>
       <span class="comment-trigger">${escapeHtml(d.trigger || '')}</span>
     </div>
     <div class="comment-body"><span class="cursor">&nbsp;</span></div>
@@ -250,6 +300,7 @@ function connect() {
   on('world', renderWorld);
   on('combat', d => renderCombat(d.combat));
   on('events', d => addEvents(d.events));
+  on('errors', d => addErrors(d.errors));
   on('comment.start', commentStart);
   on('comment.delta', commentDelta);
   on('comment.done', commentDone);
@@ -266,6 +317,9 @@ function connect() {
 // ---------------------------------------------------------------------------
 els.btnPause.addEventListener('click', () => {
   postJson('/api/control', { action: 'toggle-pause' }).catch(() => {});
+});
+els.btnDiag.addEventListener('click', () => {
+  postJson('/api/control', { action: 'toggle-diag' }).catch(() => {});
 });
 els.selectTone.addEventListener('change', () => {
   postJson('/api/control', { action: 'set-tone', value: els.selectTone.value }).catch(() => {});

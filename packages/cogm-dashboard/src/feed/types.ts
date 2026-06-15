@@ -18,6 +18,18 @@ export interface SessionEvent {
   details: Record<string, unknown>;
 }
 
+/** One captured module diagnostic (mirrors the bridge's DiagnosticEntry). */
+export interface ModuleError {
+  id: string;
+  timestamp: string;
+  timestampMs: number;
+  level: 'error' | 'warn';
+  message: string;
+  stack: string | null;
+  /** "module:<id>" / "system:<id>" / "world:<id>" parsed from the stack, or null. */
+  module: string | null;
+}
+
 export interface CombatantHp {
   value: number;
   max: number;
@@ -73,6 +85,7 @@ export interface BridgeStatus {
 export interface GameFeedHandlers {
   onEvents(events: SessionEvent[], meta: { initial: boolean }): void;
   onCombat(combat: CombatState | null): void;
+  onErrors(errors: ModuleError[], meta: { initial: boolean }): void;
   onStatus(status: BridgeStatus): void;
 }
 

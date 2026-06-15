@@ -42,6 +42,24 @@ export interface Config {
   readonly commentMaxTokens: number;
   /** Token cap for an "ask the co-GM" answer. */
   readonly askMaxTokens: number;
+  /** How often to poll module diagnostics (errors/warnings), in ms. */
+  readonly errorPollIntervalMs: number;
+  /** Rolling window size for the in-memory module-error buffer. */
+  readonly maxErrors: number;
+  /** Whether the co-GM auto-comments on new module errors. */
+  readonly commentOnErrors: boolean;
+  /** Minimum spacing between diagnostics comments, in ms. */
+  readonly errorCommentMinIntervalMs: number;
+  /** Token cap for a diagnostics comment. */
+  readonly errorCommentMaxTokens: number;
+  /** Control-channel per-request reply timeout, in ms. */
+  readonly controlRequestTimeoutMs: number;
+  /** Control-channel TCP connect timeout, in ms. */
+  readonly controlConnectTimeoutMs: number;
+  /** Control-channel heartbeat cadence, in ms. */
+  readonly controlHeartbeatIntervalMs: number;
+  /** Window after last activity before the control channel is treated as stale, in ms. */
+  readonly controlStalenessThresholdMs: number;
   /** Absolute path to the static frontend assets. */
   readonly publicDir: string;
   /** Log verbosity. */
@@ -58,6 +76,12 @@ function readNumber(name: string, fallback: number): number {
 function readString(name: string, fallback: string): string {
   const raw = process.env[name];
   return raw !== undefined && raw.trim() !== '' ? raw.trim() : fallback;
+}
+
+function readBool(name: string, fallback: boolean): boolean {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  return /^(1|true|yes|on)$/i.test(raw.trim());
 }
 
 const pollIntervalMs = readNumber('POLL_INTERVAL_MS', 4000);
@@ -84,6 +108,15 @@ export const config: Config = {
   maxEvents: readNumber('COGM_MAX_EVENTS', 80),
   commentMaxTokens: readNumber('COGM_COMMENT_MAX_TOKENS', 320),
   askMaxTokens: readNumber('COGM_ASK_MAX_TOKENS', 700),
+  errorPollIntervalMs: readNumber('ERROR_POLL_INTERVAL_MS', 6000),
+  maxErrors: readNumber('COGM_MAX_ERRORS', 100),
+  commentOnErrors: readBool('COGM_COMMENT_ON_ERRORS', true),
+  errorCommentMinIntervalMs: readNumber('ERROR_COMMENT_MIN_INTERVAL_MS', 60000),
+  errorCommentMaxTokens: readNumber('COGM_ERROR_COMMENT_MAX_TOKENS', 280),
+  controlRequestTimeoutMs: readNumber('MCP_REQUEST_TIMEOUT_MS', 15000),
+  controlConnectTimeoutMs: readNumber('MCP_CONNECT_TIMEOUT_MS', 5000),
+  controlHeartbeatIntervalMs: readNumber('MCP_HEARTBEAT_INTERVAL_MS', 10000),
+  controlStalenessThresholdMs: readNumber('MCP_STALENESS_THRESHOLD_MS', 30000),
   publicDir: path.join(moduleDir, '..', 'public'),
   logLevel,
 };

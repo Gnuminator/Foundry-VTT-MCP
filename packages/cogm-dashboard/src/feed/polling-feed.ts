@@ -12,6 +12,7 @@ import type {
   FoundryReachability,
   GameFeed,
   GameFeedHandlers,
+  ModuleError,
   SessionEvent,
 } from './types.js';
 
@@ -55,10 +56,18 @@ interface RawCombatResponse {
   combatants?: Combatant[];
 }
 
+interface RawModuleErrorsResponse {
+  success?: boolean;
+  count?: number;
+  errors?: ModuleError[];
+}
+
 export interface PollingFeedOptions {
   pollIntervalMs: number;
   combatPollIntervalMs: number;
-  /** How many recent events to backfill on first connect. */
+  /** How often to poll module diagnostics, in ms. */
+  errorPollIntervalMs: number;
+  /** How many recent events/errors to backfill on first connect. */
   backfillLimit?: number;
   logger: Logger;
 }
@@ -69,8 +78,12 @@ export class PollingGameFeed implements GameFeed {
   private firstEventPoll = true;
   private eventPollInFlight = false;
   private combatPollInFlight = false;
+  private errorCursor: string | null = null;
+  private firstErrorPoll = true;
+  private errorPollInFlight = false;
   private eventTimer: NodeJS.Timeout | null = null;
   private combatTimer: NodeJS.Timeout | null = null;
+  private errorTimer: NodeJS.Timeout | null = null;
   private started = false;
   private foundry: FoundryReachability = 'unknown';
   private consecutiveFailures = 0;
@@ -98,11 +111,14 @@ export class PollingGameFeed implements GameFeed {
       this.foundry = 'unknown';
       this.cursor = null;
       this.firstEventPoll = true;
+      this.errorCursor = null;
+      this.firstErrorPoll = true;
       this.consecutiveFailures = 0;
       this.publishStatus();
       // Kick an immediate poll so the UI populates without waiting a full tick.
       void this.pollEvents();
       void this.pollCombat();
+      void this.pollErrors();
     });
 
     this.client.on('disconnected', (error: Error) => {
@@ -115,14 +131,17 @@ export class PollingGameFeed implements GameFeed {
 
     this.eventTimer = setInterval(() => void this.pollEvents(), this.options.pollIntervalMs);
     this.combatTimer = setInterval(() => void this.pollCombat(), this.options.combatPollIntervalMs);
+    this.errorTimer = setInterval(() => void this.pollErrors(), this.options.errorPollIntervalMs);
     this.publishStatus();
   }
 
   stop(): void {
     if (this.eventTimer) clearInterval(this.eventTimer);
     if (this.combatTimer) clearInterval(this.combatTimer);
+    if (this.errorTimer) clearInterval(this.errorTimer);
     this.eventTimer = null;
     this.combatTimer = null;
+    this.errorTimer = null;
     this.client.close();
     this.started = false;
   }
@@ -176,6 +195,38 @@ export class PollingGameFeed implements GameFeed {
       this.handlePollError('get-combat-state', error);
     } finally {
       this.combatPollInFlight = false;
+    }
+  }
+
+  private async pollErrors(): Promise<void> {
+    if (!this.client.isConnected || this.errorPollInFlight) return;
+    this.errorPollInFlight = true;
+    try {
+      const args: Record<string, unknown> =
+        this.errorCursor !== null
+          ? { sinceTimestamp: this.errorCursor, limit: 100 }
+          : { limit: this.backfillLimit };
+
+      const response = await this.client.callTool<RawModuleErrorsResponse>(
+        'get-module-errors',
+        args
+      );
+      const errors = Array.isArray(response.errors) ? response.errors : [];
+
+      this.onPollSuccess();
+
+      if (errors.length > 0) {
+        this.handlers.onErrors(errors, { initial: this.firstErrorPoll });
+        // get-module-errors returns no latestTimestamp, so cursor on the newest
+        // entry's timestamp (monotonic; out-of-order replies can't rewind it).
+        for (const e of errors) this.errorCursor = this.maxTimestamp(this.errorCursor, e.timestamp);
+      }
+      this.firstErrorPoll = false;
+      this.publishStatus();
+    } catch (error) {
+      this.handlePollError('get-module-errors', error);
+    } finally {
+      this.errorPollInFlight = false;
     }
   }
 
