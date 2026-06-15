@@ -1,6 +1,6 @@
 {
   "name": "@foundry-mcp/cogm-dashboard",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Standalone live AI \"Co-GM\" dashboard that pulls the Foundry VTT MCP bridge feed and streams Claude commentary to a browser.",
   "type": "module",
   "private": true,
